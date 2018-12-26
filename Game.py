@@ -120,22 +120,30 @@ class Game:
     any entry in the tuple 'grid' must be a list
     of length num_cols- an initializing parameter.
     """
-    shape_size: int             # determines many of the following qualities
+    shape_size: int             # > 0. determines many of the following qualities
     grid: tuple                 # tuple of lists of shape keys (Cells)
-    score: tuple                # tuple of ints: each from a unique line(s)-clearing
+    ceil_len: int = 0           # RI: must be < len(self.grid)
+    score: int = 0              # tuple of ints: each from a unique line(s)-clearing
+    combo_streak: int = 0
     period: float               # 2 / SCALAR_1 / ((score / SCALAR_2 + 1) ** 2 - 1)
 
     next_shape: Shape = None    # to display for the player (helpful to them)
     curr_shape: Shape = None    # current shape falling & being controlled by the player
     save_shape: list            # TODO: length should not exceed SAVE_LEN
-    position: Tile        # position of the current shape's pivot
+    position: Tile              # position of the current shape's pivot
     rotation: int               # {0:down=south, 1:down=east, 2:down=north, 3:down=west}
+
+    @staticmethod
+    def new_grid_row(num_cols: int):
+        row = ()
+        for c in range(num_cols):
+            row += Cell()
+        return row
 
     def __init__(self, shape_size: int = 4,
                  num_rows: int = None,
                  num_cols: int = None):
         self.shape_size = shape_size
-        self.score = 0
 
         if num_rows is None:
             num_rows = Data.NUM_ROWS[shape_size]
@@ -148,10 +156,7 @@ class Game:
 
         grid = ()
         for r in range(num_rows):
-            row = ()
-            for c in range(num_cols):
-                row += Cell()  # TODO: decide if this should be null
-            grid += row
+            grid += Game.new_grid_row(num_cols)
 
         self.next_shape = Data.get_random_shape(shape_size)
         self.curr_shape = Data.get_random_shape(shape_size)
@@ -159,26 +164,33 @@ class Game:
         self.position = num_cols / 2
         self.rotation = 0
 
-    def translate_allowed(self, direction: int = 0):
-        la_x = (0, 1, 0, -1)  # horizontal lookahead offsets
-        la_y = (-1, 0, 1, 0)  # vertical lookahead offsets
-        angle = (self.rotation + direction) % 4
-        bounds: tuple = self.curr_shape.bounds[angle]
-        for t in bounds:
-            x = self.position.x0() + t.x[self.rotation] + la_x[direction]
-            y = self.position.y0() + t.y[self.rotation] + la_y[direction]
+    @staticmethod
+    def calculate_score(num_lines):
+        if num_lines is 0:
+            return 0
+        return 2 * Game.calculate_score(num_lines - 1) + 1
 
-            if not self.grid[y][x].is_empty():
-                return False
-        return True
+    def handle_clears(self):
+        """
+        shifts all lines above those cleared down.
+        updates the player's score, calculates the
+        new period based on the new score, and
+        resets the timer.
+        """
+        lines_cleared = 0
+        for y in range(len(self.grid) - self.ceil_len):
+            if not any(map(Cell.is_empty, self.grid[y])):
+                lines_cleared += 1
+                self.grid -= self.grid[y]  # TODO: Not sure if this is legit
+                self.grid += Game.new_grid_row(len(self.grid[0]))
 
-    def rotate_clockwise(self):
-        self.rotation += 1
-        self.rotation %= 4
+        if lines_cleared is not self.shape_size:
+            self.combo_streak = 0
+        self.score += Game.calculate_score(lines_cleared + self.combo_streak)
+        if lines_cleared is self.shape_size:
+            self.combo_streak += 1
 
-    def rotate_counterclockwise(self):
-        self.rotation += 3
-        self.rotation %= 4
+        # TODO: reset timer, update period
 
     def set_curr_shape(self):
         """
@@ -187,7 +199,7 @@ class Game:
         """
 
         # set the current shape
-        score: int = 0
+        self.handle_clears()
 
         self.curr_shape = self.next_shape
         self.next_shape = Data.get_random_shape(self.shape_size)
@@ -195,4 +207,39 @@ class Game:
         # TODO: calculate spawn position
         self.rotation = 0
 
-        return score
+    def translate(self, direction: int = 0):
+        """
+        Automatically calls self.set_curr_shape()
+        if hit bottom. Returns True if translate
+        was successful.
+        """
+        la_x = (0, 1, 0, -1)  # horizontal lookahead offsets
+        la_y = (-1, 0, 1, 0)  # vertical lookahead offsets
+        angle = (self.rotation + direction) % 4
+        bounds: tuple = self.curr_shape.bounds[angle]
+
+        for t in bounds:
+            x = self.position.x0() + t.x[self.rotation] + la_x[direction]
+            y = self.position.y0() + t.y[self.rotation] + la_y[direction]
+
+            if not self.grid[y][x].is_empty():
+                if direction == 0:
+                    self.set_curr_shape()
+                return False
+
+        self.position.x[0] += la_x[direction]
+        self.position.y[0] += la_y[direction]
+        return True
+
+    def hard_drop(self):
+        not_done = self.translate(0)
+        while not_done:
+            not_done = self.translate(0)
+
+    def rotate_clockwise(self):
+        self.rotation += 1
+        self.rotation %= 4
+
+    def rotate_counterclockwise(self):
+        self.rotation += 3
+        self.rotation %= 4
