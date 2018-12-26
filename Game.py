@@ -74,9 +74,9 @@ class Shape:
         bound_000 = ()
         bound_180 = ()
         for x in set(map(Tile.x0, self.tiles)):
-            row = filter(lambda t: t.x == x, self.tiles)  # vertical slice
-            bound_000 += Tile(x, min(map(Tile.y0, row)))
-            bound_180 += Tile(x, max(map(Tile.y0, row)))
+            col = filter(lambda t: t.x == x, self.tiles)  # vertical slice
+            bound_000 += Tile(x, min(map(Tile.y0, col)))
+            bound_180 += Tile(x, max(map(Tile.y0, col)))
         bound_270 = ()
         bound_090 = ()
         for y in set(map(Tile.y0, self.tiles)):
@@ -204,7 +204,9 @@ class Game:
         self.curr_shape = self.next_shape
         self.next_shape = Data.get_random_shape(self.shape_size)
 
-        # TODO: calculate spawn position
+        shape_ceil = max(map(Tile.y0, self.curr_shape.bounds[2]))
+        y = len(self.grid) - self.ceil_len - 1 - shape_ceil
+        self.position = Tile(len(self.grid[0]), y)
         self.rotation = 0
 
     def translate(self, direction: int = 0):
@@ -243,3 +245,13 @@ class Game:
     def rotate_counterclockwise(self):
         self.rotation += 3
         self.rotation %= 4
+
+
+class GUI:
+    """
+
+    """
+    game: Game
+
+    def __init__(self):
+        game = Game()
