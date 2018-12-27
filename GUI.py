@@ -1,5 +1,15 @@
 import random
 
 
-grid = ([0, 1, 2], (3, 4, 5), (6, 7, 8))
-grid[0][0] = 2
+class Test2:
+    n: int
+
+    def __init__(self):
+        self.n = 1
+
+
+class Test1:
+    test2 = Test2()
+    test2.n += 1
+    print(test2.n)
+

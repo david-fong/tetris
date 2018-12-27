@@ -19,6 +19,10 @@ def get_random_shape(shape_size):
     return random.choice(SHAPES[shape_size])
 
 
+SCALAR_1 = 1.0
+SCALAR_2 = 1.0
+
+
 NUM_ROWS = {
     4: 20
 }

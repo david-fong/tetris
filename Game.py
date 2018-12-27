@@ -1,3 +1,5 @@
+from threading import Thread, Lock, Condition
+
 import Data
 
 
@@ -107,11 +109,48 @@ class Cell:
     def __init__(self):
         self.key = None
 
+    def set(self, key: str):
+        self.key = key
+
     def clear(self):
         self.key = None
 
     def is_empty(self):
         return self.key is None
+
+
+class Gravity(Thread):
+    """
+    Calls soft drops and regular falling
+    """
+
+    game = None
+    period: float  # 2 / SCALAR_1 / ((score / SCALAR_2 + 1) ** 2 - 1)
+    soft_drop: bool
+    cv = None
+
+    def __init__(self, game, cv: Condition):
+        super(Gravity, self).__init__(daemon=True)
+        self.game = game
+        self.calculate_period(0)
+        self.soft_drop = False
+        self.cv = cv
+
+    def run(self):
+        fall_counter = 0
+        with self.cv:
+            while True:
+                if self.cv.wait(self.period):  # there was no timeout (from a hard drop)
+                    fall_counter += 1
+                    if fall_counter is 2:
+                        fall_counter = 0
+                        self.game.translate(0)
+                    elif self.soft_drop:
+                        self.game.translate(0)
+
+    def calculate_period(self, score: int):
+        self.period = 2 / Data.SCALAR_1 / ((score / Data.SCALAR_2 + 1) ** 2)
+        # Data.SCALAR_3 * (math.log(score + 1, Data.BASE) + 1)
 
 
 class Game:
@@ -125,13 +164,14 @@ class Game:
     ceil_len: int = 0           # RI: must be < len(self.grid)
     score: int = 0              # tuple of ints: each from a unique line(s)-clearing
     combo_streak: int = 0
-    period: float               # 2 / SCALAR_1 / ((score / SCALAR_2 + 1) ** 2 - 1)
 
     next_shape: Shape = None    # to display for the player (helpful to them)
     curr_shape: Shape = None    # current shape falling & being controlled by the player
     save_shape: list            # TODO: length should not exceed SAVE_LEN
     position: Tile              # position of the current shape's pivot
     rotation: int               # {0:down=south, 1:down=east, 2:down=north, 3:down=west}
+
+    gravity: Gravity
 
     @staticmethod
     def new_grid_row(num_cols: int):
@@ -164,6 +204,8 @@ class Game:
         self.position = num_cols / 2
         self.rotation = 0
 
+        self.gravity = Gravity(self, Condition())
+
     @staticmethod
     def calculate_score(num_lines):
         if num_lines is 0:
@@ -186,11 +228,12 @@ class Game:
 
         if lines_cleared is not self.shape_size:
             self.combo_streak = 0
+
         self.score += Game.calculate_score(lines_cleared + self.combo_streak)
+        self.gravity.calculate_period(self.score)
+
         if lines_cleared is self.shape_size:
             self.combo_streak += 1
-
-        # TODO: reset timer, update period
 
     def set_curr_shape(self):
         """
@@ -198,22 +241,27 @@ class Game:
         contacts something underneath itself
         """
 
-        # set the current shape
-        self.handle_clears()
+        for c in self.curr_shape.tiles:
+            x = self.position.x0() + c.x[self.rotation]
+            y = self.position.y0() + c.y[self.rotation]
+            self.grid[y][x].set(self.curr_shape.name)
+
+        self.handle_clears()  # check if lines were cleared, handle if so
 
         self.curr_shape = self.next_shape
         self.next_shape = Data.get_random_shape(self.shape_size)
 
         shape_ceil = max(map(Tile.y0, self.curr_shape.bounds[2]))
-        y = len(self.grid) - self.ceil_len - 1 - shape_ceil
-        self.position = Tile(len(self.grid[0]), y)
+        spawn_y = len(self.grid) - self.ceil_len - 1 - shape_ceil
+        self.position = Tile(len(self.grid[0]), spawn_y)
         self.rotation = 0
 
     def translate(self, direction: int = 0):
         """
         Automatically calls self.set_curr_shape()
-        if hit bottom. Returns True if translate
-        was successful.
+        if at bottom. Returns True if a downward
+        translation could not be done: ie. the
+        current shape was set.
         """
         la_x = (0, 1, 0, -1)  # horizontal lookahead offsets
         la_y = (-1, 0, 1, 0)  # vertical lookahead offsets
@@ -226,8 +274,8 @@ class Game:
 
             if not self.grid[y][x].is_empty():
                 if direction == 0:
-                    self.set_curr_shape()
-                return False
+                    self.set_curr_shape()  # the shape has something under itself
+                    return False
 
         self.position.x[0] += la_x[direction]
         self.position.y[0] += la_y[direction]
@@ -237,6 +285,7 @@ class Game:
         not_done = self.translate(0)
         while not_done:
             not_done = self.translate(0)
+        self.gravity.cv.notify()  # wake up the wait() in self.gravity
 
     def rotate_clockwise(self):
         self.rotation += 1
