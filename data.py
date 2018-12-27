@@ -17,6 +17,22 @@ SHAPES = {
     )
 }
 
+COLOR_SCHEMES = {
+    4: {
+        'default': {
+            'bg': 'black',
+            None: 'black',
+            'I': 'cyan',
+            'J': 'blue',
+            'L': 'orange',
+            'O': 'yellow',
+            'S': 'green',
+            'T': 'purple',
+            'Z': 'red'
+        }
+    }
+}
+
 
 def get_random_shape(shape_size):
     return random.choice(SHAPES[shape_size])
@@ -33,6 +49,14 @@ NUM_ROWS = {
 
 NUM_COLS = {
     4: 10
+}
+
+GUI_WAIT_TIMEOUT = 0.001
+
+GUI_CELL_WID = 10
+
+KBD_EVENTS = {
+    '<w>'
 }
 
 STOCKPILE_CAPACITY = 4

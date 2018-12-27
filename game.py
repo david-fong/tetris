@@ -74,6 +74,8 @@ class Game:
     Representation Invariant:
     any entry in the tuple 'grid' must be a list
     of length num_cols- an initializing parameter.
+
+    Start the game by calling self.start()
     """
     shape_size: int             # > 0. determines many of the following qualities
     grid: tuple                 # tuple of lists of shape keys (Cells)
@@ -82,6 +84,7 @@ class Game:
     lines: int = 0              # number of lines cleared in total
     score: int = 0              # for player (indicates skill?)
     combo: int = 0              # streak of clearing <shape_size> lines with one shape
+    cv: Condition               # from a GUI; to notify it when to update grid display
 
     next_shape: Shape = None    # for player (helpful to them)
     curr_shape: Shape = None    # current shape falling & being controlled by the player
@@ -100,7 +103,8 @@ class Game:
 
     def __init__(self, shape_size: int = 4,
                  num_rows: int = None,
-                 num_cols: int = None):
+                 num_cols: int = None,
+                 cv: Condition = Condition()):
         self.shape_size = shape_size
 
         # use defaults or floor choices
@@ -119,6 +123,8 @@ class Game:
         for r in range(num_rows):
             grid += Game.new_grid_row(num_cols)
 
+        self.cv = cv
+
         self.next_shape = data.get_random_shape(shape_size)
         self.curr_shape = data.get_random_shape(0)
         self.set_curr_shape()
@@ -131,9 +137,18 @@ class Game:
         self.rotation = 0
 
         self.gravity = Gravity(self, Condition())
+
+    def start(self):
+        """
+        Used to make gravity start applying
+        """
         self.gravity.start()
 
     def stockpile_access(self, slot: int = 0):
+        """
+        switches the current shape with another
+        being stored away. select by index, <slot>
+        """
         if slot < 0:
             slot = 0
         elif slot >= data.STOCKPILE_CAPACITY:
@@ -217,6 +232,8 @@ class Game:
         self.curr_shape = self.next_shape
         self.next_shape = data.get_random_shape(self.shape_size)
 
+        self.cv.notify()
+
     def translate(self, direction: int = 0):
         """
         Automatically calls self.set_curr_shape()
@@ -260,13 +277,3 @@ class Game:
     def rotate_counterclockwise(self):
         self.rotation += 3
         self.rotation %= 4
-
-
-class GUI:
-    """
-
-    """
-    game: Game
-
-    def __init__(self):
-        game = Game()
