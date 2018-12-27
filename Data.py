@@ -31,6 +31,8 @@ NUM_COLS = {
     4: 10
 }
 
+STOCKPILE_CAPACITY = 4
+
 """Courtesy of Wikipedia"""
 facts = {
     "Tetris was created in 1984 by Russian Game designer Alexey Pajitnov",

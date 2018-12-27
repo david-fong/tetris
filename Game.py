@@ -140,13 +140,14 @@ class Gravity(Thread):
         fall_counter = 0
         with self.cv:
             while True:
-                if self.cv.wait(self.period):  # there was no timeout (from a hard drop)
-                    fall_counter += 1
-                    if fall_counter is 2:
-                        fall_counter = 0
-                        self.game.translate(0)
-                    elif self.soft_drop:
-                        self.game.translate(0)
+                if not self.cv.wait(self.period):
+                    continue  # there was a timeout (from a hard drop)
+                fall_counter += 1
+                if fall_counter is 2:
+                    fall_counter = 0
+                    self.game.translate(0)
+                elif self.soft_drop:
+                    self.game.translate(0)
 
     def calculate_period(self, score: int):
         self.period = 2 / Data.SCALAR_1 / ((score / Data.SCALAR_2 + 1) ** 2)
@@ -167,7 +168,7 @@ class Game:
 
     next_shape: Shape = None    # to display for the player (helpful to them)
     curr_shape: Shape = None    # current shape falling & being controlled by the player
-    save_shape: list            # TODO: length should not exceed SAVE_LEN
+    stockpile: list             # RI: length should not exceed Data.STOCKPILE_CAPACITY
     position: Tile              # position of the current shape's pivot
     rotation: int               # {0:down=south, 1:down=east, 2:down=north, 3:down=west}
 
@@ -200,11 +201,34 @@ class Game:
 
         self.next_shape = Data.get_random_shape(shape_size)
         self.curr_shape = Data.get_random_shape(shape_size)
+        self.stockpile = []
+        for i in range(Data.STOCKPILE_CAPACITY):
+            self.stockpile.append(None)
 
         self.position = num_cols / 2
         self.rotation = 0
 
         self.gravity = Gravity(self, Condition())
+        self.gravity.start()
+
+    def stockpile_access(self, slot: int = 0):
+        if slot < 0:
+            slot = 0
+        elif slot >= Data.STOCKPILE_CAPACITY:
+            slot = Data.STOCKPILE_CAPACITY - 1
+
+        tmp: Shape = self.stockpile[slot]
+        if tmp is not None:
+            # check if the stock shape has room to be swapped-in:
+            for t in tmp.tiles:
+                x = self.position.x0() + t.x0()
+                y = self.position.y0() + t.y0()
+                if not self.grid[y][x].is_empty():
+                    return
+
+            self.stockpile[slot] = self.curr_shape
+            self.curr_shape = tmp
+            self.rotation = 0
 
     @staticmethod
     def calculate_score(num_lines):
