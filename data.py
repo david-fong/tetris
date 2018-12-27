@@ -1,4 +1,4 @@
-from game import Shape
+from game import Shape, Game
 import random
 
 
@@ -56,7 +56,7 @@ GUI_WAIT_TIMEOUT = 0.001
 GUI_CELL_WID = 10
 
 KBD_EVENTS = {
-    '<w>'
+    '<w>': Game.hard_drop
 }
 
 STOCKPILE_CAPACITY = 4

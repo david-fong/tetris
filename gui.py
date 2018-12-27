@@ -1,17 +1,17 @@
 import tkinter
-from tkinter import Frame, Button, Event
+from tkinter import Frame, Button, Event, colorchooser
 
 from game import *
 
 
-class GUI:
+class GUI(Frame):
     """
 
     """
 
     game: Game              #
     cv: Condition           # used to be notified when ready to update display
-    root: Frame             # top level frame
+    master: Frame           # top level frame
     grid: Frame             # holds buttons for display that represent Cell objects
     buttons: tuple          # stores buttons for code use
     cell_map: dict          # maps buttons to their corresponding cells
@@ -20,17 +20,20 @@ class GUI:
     color_schemes: dict     # a dictionary of color schemes for this game's shape size
     current_cs: str         # a key to get color values for Frame and Shape objects
 
-    def __init__(self):
+    def __init__(self, master):
         """
 
         """
+
+        super().__init__(master)
+        self.master = master
+        self.pack()
 
         self.cv = Condition()
         self.game = Game(cv=self.cv)
         self.color_schemes = data.COLOR_SCHEMES[self.game.shape_size]
         self.current_cs: str = 'default'
 
-        self.root = tkinter.Tk('Tetris')  # TODO: do I need to pack this?
         self.grid = Frame(self.root, bg=self.cs('bg')).pack(side='left')
         self.virtual_kbd = Frame(self.root, bg=self.cs('bg'))
 
@@ -44,8 +47,9 @@ class GUI:
                     bg=self.cs(' '),
                     height=data.GUI_CELL_WID,
                     width=data.GUI_CELL_WID).grid(row=row, col=col)
-                for kbd_event in data.KBD_EVENTS:
-                    b.bind(kbd_event, self.update_grid, '+')
+                for kbd_event, callback in data.KBD_EVENTS.items():
+                    b.bind(kbd_event, self.update_grid, '')
+                    b.bind(kbd_event, callback, '+')
                 button_row += b
                 self.cell_map[b] = self.game.grid[row][col]
             self.buttons += button_row
