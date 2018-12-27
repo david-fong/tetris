@@ -1,8 +1,11 @@
-from Game import Shape
+from game import Shape
 import random
 
 
 SHAPES = {
+    0: (
+        Shape((), None)
+    ),
     4: (
         Shape(((-1, 0), (0, 0), (1, 0), (2, 0)), 'I'),
         Shape(((-1, 0), (0, 0), (1, 0), (1, -1)), 'J'),
@@ -19,8 +22,9 @@ def get_random_shape(shape_size):
     return random.choice(SHAPES[shape_size])
 
 
-SCALAR_1 = 1.0
-SCALAR_2 = 1.0
+SCORE_SCALAR = 2.0      # must be > 0
+SCORE_BASE = 2.0        # must be > 1
+SCORE_OFFSET = 16.0     # must be > 0
 
 
 NUM_ROWS = {
