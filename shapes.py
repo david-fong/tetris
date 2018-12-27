@@ -42,6 +42,12 @@ class Tile:
     def y0(self):
         return self.y[0]
 
+    def x_(self, rot: int):
+        return self.x[rot]
+
+    def y_(self, rot: int):
+        return self.y[rot]
+
 
 class Shape:
     """

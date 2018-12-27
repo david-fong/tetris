@@ -1,15 +1,10 @@
 import random
+import tkinter
+from tkinter import Frame, Canvas, Menu, Event, colorchooser
 
-
-class Test2:
-    n: int
-
-    def __init__(self):
-        self.n = 1
-
-
-class Test1:
-    test2 = Test2()
-    test2.n += 1
-    print(test2.n)
-
+root = tkinter.Tk()
+c = Canvas(root, height=20, width=20, bg='purple')
+c.pack(expand=False, fill='both')
+cell = c.create_rectangle(0, 0, 10, 10, fill='green')
+c['bg'] = 'orange'
+root.mainloop()

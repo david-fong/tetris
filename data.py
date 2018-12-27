@@ -1,4 +1,4 @@
-from game import Shape, Game
+from game import Shape, Game, Tile
 import random
 
 
@@ -21,7 +21,7 @@ COLOR_SCHEMES = {
     4: {
         'default': {
             'bg': 'black',
-            None: 'black',
+            ' ': 'black',
             'I': 'cyan',
             'J': 'blue',
             'L': 'orange',
@@ -38,10 +38,15 @@ def get_random_shape(shape_size):
     return random.choice(SHAPES[shape_size])
 
 
-SCORE_SCALAR = 2.0      # must be > 0
-SCORE_BASE = 2.0        # must be > 1
-SCORE_OFFSET = 16.0     # must be > 0
+def calculate_score(num_lines):
+    if num_lines is 0:
+        return 0
+    return 2 * calculate_score(num_lines - 1) + 1
 
+
+PERIOD_SCALAR = 2.0      # must be > 0
+PERIOD_BASE = 2.0        # must be > 1
+PERIOD_OFFSET = 16.0     # must be > 0
 
 NUM_ROWS = {
     4: 20
@@ -51,9 +56,15 @@ NUM_COLS = {
     4: 10
 }
 
-GUI_WAIT_TIMEOUT = 0.001
-
 GUI_CELL_WID = 10
+GUI_CELL_PAD = 0
+
+
+def canvas_dimension(num_cells: int):
+    result = GUI_CELL_WID + GUI_CELL_PAD
+    result *= num_cells
+    return result + GUI_CELL_PAD
+
 
 KBD_EVENTS = {
     '<w>': Game.hard_drop

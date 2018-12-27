@@ -1,5 +1,5 @@
 import tkinter
-from tkinter import Frame, Button, Event, colorchooser
+from tkinter import Frame, Canvas, Menu, Event, colorchooser
 
 from game import *
 
@@ -9,16 +9,13 @@ class GUI(Frame):
 
     """
 
-    game: Game              #
-    cv: Condition           # used to be notified when ready to update display
-    master: Frame           # top level frame
-    grid: Frame             # holds buttons for display that represent Cell objects
-    buttons: tuple          # stores buttons for code use
-    cell_map: dict          # maps buttons to their corresponding cells
-    virtual_kbd: Frame      # emulates buttons used for playing
+    game: Game          #
+    cs: dict            # a map from color swatches to actual color values
 
-    color_schemes: dict     # a dictionary of color schemes for this game's shape size
-    current_cs: str         # a key to get color values for Frame and Shape objects
+    master: Frame       # top level frame
+    menu: Menu
+    canvas: Canvas
+    virtual_kbd: Frame  # emulates buttons used for playing
 
     def __init__(self, master):
         """
@@ -29,39 +26,29 @@ class GUI(Frame):
         self.master = master
         self.pack()
 
-        self.cv = Condition()
-        self.game = Game(cv=self.cv)
-        self.color_schemes = data.COLOR_SCHEMES[self.game.shape_size]
-        self.current_cs: str = 'default'
+        self.game = Game()
+        self.set_color_scheme()
 
-        self.grid = Frame(self.root, bg=self.cs('bg')).pack(side='left')
-        self.virtual_kbd = Frame(self.root, bg=self.cs('bg'))
+        self.menu = Menu(master)
+        master['menu'] = self.menu
+        self.canvas = Canvas(self.master, bg=self.cs['bg']).pack(side='left')
+        self.canvas['height'] = data.canvas_dimension(self.game.dimensions.y0())
+        self.canvas['width'] = data.canvas_dimension(self.game.dimensions.x0())
+        self.virtual_kbd = Frame(self.master, bg=self.cs['bg'])
 
-        self.buttons = ()
-        self.cell_map = {}
-        for row in range(len(self.game.grid)):
-            button_row = ()
-            for col in range(len(self.game.grid[row])):
-                b: Button = Button(
-                    self.grid,
-                    bg=self.cs(' '),
-                    height=data.GUI_CELL_WID,
-                    width=data.GUI_CELL_WID).grid(row=row, col=col)
-                for kbd_event, callback in data.KBD_EVENTS.items():
-                    b.bind(kbd_event, self.update_grid, '')
-                    b.bind(kbd_event, callback, '+')
-                button_row += b
-                self.cell_map[b] = self.game.grid[row][col]
-            self.buttons += button_row
+    def draw_shape(self, event: Event, erase: bool = False):
+        g = self.game
+        s: Shape = g.curr_shape
+        t: Tile
+        for t in s.tiles:
+            points = [0, 0, 0, 0]
+            x = g.position.x0() + t.x[g.rotation]
+            y = g.dimensions.y0() - (1 + g.position.x0() + t.y[g.rotation])
+            points[0] = data.canvas_dimension(x)
+            points[1] = data.canvas_dimension(y)
+            points[2] = points[0] + data.GUI_CELL_WID
+            points[3] = points[1] + data.GUI_CELL_WID
+            self.canvas.create_rectangle(points, fill=self.cs[s.name])
 
-        self.root.mainloop()
-
-    def update_grid(self, event: Event):
-        with self.cv:  # see game.Game.set_curr_shape
-            self.cv.wait(data.GUI_WAIT_TIMEOUT)
-            cell = self.cell_map[event.widget]
-            event.widget['bg'] = self.cs(cell.key)
-
-    def cs(self, key: str = ' '):
-        """helper function to get value from color_scheme dict"""
-        return self.color_schemes[self.current_cs][key]
+    def set_color_scheme(self, cs_name: str = 'default'):
+        self.cs = data.COLOR_SCHEMES[self.game.shape_size][cs_name]

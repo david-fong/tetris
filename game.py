@@ -11,19 +11,26 @@ class Cell:
     Represents a shape's key, which
     can be used to get a color value.
     """
+    __EMPTY = None
     key: str
+    upstairs_neighbor = None  # Another Cell object
 
-    def __init__(self):
-        self.key = None
+    def __init__(self, upstairs_neighbor=None):
+        self.key = Cell.__EMPTY
+        assert isinstance(upstairs_neighbor, Cell)
+        self.upstairs_neighbor = upstairs_neighbor
 
     def set(self, key: str):
         self.key = key
 
-    def clear(self):
-        self.key = None
+    def catch_falling(self):
+        if self.upstairs_neighbor is None:
+            self.key = None
+        else:
+            self.key = self.upstairs_neighbor.key
 
     def is_empty(self):
-        return self.key is None
+        return self.key is Cell.__EMPTY
 
 
 class Gravity(Thread):
@@ -65,8 +72,8 @@ class Gravity(Thread):
         a number from the period function
         """
         x = self.game.lines
-        self.period = (x + data.SCORE_OFFSET + 1) / (data.SCORE_OFFSET + 1)
-        self.period = data.SCORE_SCALAR * log(self.period, data.SCORE_BASE) + 1
+        self.period = (x + data.PERIOD_OFFSET + 1) / (data.PERIOD_OFFSET + 1)
+        self.period = data.PERIOD_SCALAR * log(self.period, data.PERIOD_BASE) + 1
 
 
 class Game:
@@ -78,13 +85,13 @@ class Game:
     Start the game by calling self.start()
     """
     shape_size: int             # > 0. determines many of the following qualities
+    dimensions: Tile            # stores the number of rows in y and cols in x
     grid: tuple                 # tuple of lists of shape keys (Cells)
     ceil_len: int = 0           # RI: must be < len(self.grid)
 
     lines: int = 0              # number of lines cleared in total
     score: int = 0              # for player (indicates skill?)
     combo: int = 0              # streak of clearing <shape_size> lines with one shape
-    cv: Condition               # from a GUI; to notify it when to update grid display
 
     next_shape: Shape = None    # for player (helpful to them)
     curr_shape: Shape = None    # current shape falling & being controlled by the player
@@ -103,8 +110,7 @@ class Game:
 
     def __init__(self, shape_size: int = 4,
                  num_rows: int = None,
-                 num_cols: int = None,
-                 cv: Condition = Condition()):
+                 num_cols: int = None):
         self.shape_size = shape_size
 
         # use defaults or floor choices
@@ -119,11 +125,10 @@ class Game:
         elif num_cols < shape_size * 2:
             num_cols = shape_size * 2
 
+        self.dimensions = Tile(num_cols, num_rows)
         grid = ()
-        for r in range(num_rows):
+        for row in range(num_rows):
             grid += Game.new_grid_row(num_cols)
-
-        self.cv = cv
 
         self.next_shape = data.get_random_shape(shape_size)
         self.curr_shape = data.get_random_shape(0)
@@ -167,12 +172,6 @@ class Game:
             self.curr_shape = tmp
             self.rotation = 0
 
-    @staticmethod
-    def calculate_score(num_lines):
-        if num_lines is 0:
-            return 0
-        return 2 * Game.calculate_score(num_lines - 1) + 1
-
     def handle_clears(self):
         """
         shifts all lines above those cleared down.
@@ -181,17 +180,18 @@ class Game:
         resets the timer.
         """
         lines_cleared = 0
-        for y in range(len(self.grid) - self.ceil_len):
+        for y in range(self.dimensions.y0() - self.ceil_len):
             if not any(map(Cell.is_empty, self.grid[y])):
                 lines_cleared += 1
-                self.grid -= self.grid[y]  # TODO: Not sure if this is legit
-                self.grid += Game.new_grid_row(len(self.grid[0]))
+                for line in self.grid[y:-1]:
+                    for cell in line:
+                        cell.catch_falling()
         self.lines += lines_cleared
 
         if lines_cleared is not self.shape_size:
             self.combo = 0
 
-        self.score += Game.calculate_score(lines_cleared + self.combo)
+        self.score += data.calculate_score(lines_cleared + self.combo)
         self.gravity.calculate_period()
 
         if lines_cleared is self.shape_size:
@@ -214,8 +214,8 @@ class Game:
 
         # get the pivot position for the next tile to spawn in
         shape_ceil = max(map(Tile.y0, self.next_shape.bounds[2]))
-        spawn_y = len(self.grid) - self.ceil_len - 1 - shape_ceil
-        self.position = Tile(len(self.grid[0]), spawn_y)
+        spawn_y = self.dimensions.y0() - 1 - self.ceil_len - shape_ceil
+        self.position = Tile(self.dimensions.x0(), spawn_y)
         self.rotation = 0
 
         # check if the next tile has room to spawn
@@ -231,8 +231,6 @@ class Game:
         # didn't lose; pass on next shape to current shape
         self.curr_shape = self.next_shape
         self.next_shape = data.get_random_shape(self.shape_size)
-
-        self.cv.notify()
 
     def translate(self, direction: int = 0):
         """
