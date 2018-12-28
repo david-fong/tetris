@@ -1,7 +1,7 @@
 
 import random
 
-from game import Cell, Game
+from game import Game
 from shapes import Shape
 
 SHAPES = {
