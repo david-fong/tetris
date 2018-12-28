@@ -1,7 +1,5 @@
-
 import random
 
-from game import Game
 from shapes import Shape
 
 SHAPES = {
@@ -16,6 +14,15 @@ SHAPES = {
     )
 }
 
+
+def get_random_shape(shape_size):
+    return random.choice(SHAPES[shape_size])
+
+
+"""
+All sizes must have a 
+color scheme with key='default'
+"""
 COLOR_SCHEMES = {
     4: {
         'default': {
@@ -33,8 +40,17 @@ COLOR_SCHEMES = {
 }
 
 
-def get_random_shape(shape_size):
-    return random.choice(SHAPES[shape_size])
+def get_color_scheme(shape_size: int, key: str):
+    """
+    returns the dictionary corresponding to key
+    and that corresponding to 'default' if key
+    does not exist
+    :rtype: dict
+    """
+    try:
+        return COLOR_SCHEMES[shape_size][key]
+    except KeyError:
+        return COLOR_SCHEMES[shape_size]['default']
 
 
 def calculate_score(num_lines):
@@ -55,8 +71,8 @@ NUM_COLS = {
     4: 10
 }
 
-GUI_CELL_WID = 10
-GUI_CELL_PAD = 0
+GUI_CELL_WID = 20
+GUI_CELL_PAD = 2
 
 
 def canvas_dmn(num_cells: int):
@@ -64,10 +80,6 @@ def canvas_dmn(num_cells: int):
     result *= num_cells
     return result + GUI_CELL_PAD
 
-
-KBD_EVENTS = {
-    '<w>': Game.hard_drop
-}
 
 STOCKPILE_CAPACITY = 4
 

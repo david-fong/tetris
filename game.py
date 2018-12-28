@@ -55,6 +55,8 @@ class Gravity(Thread):
 
     def __init__(self, game, cv: Condition):
         super(Gravity, self).__init__(daemon=True)
+
+        assert isinstance(game, Game)
         self.game = game
         self.calculate_period()
         self.cv = cv
@@ -63,7 +65,8 @@ class Gravity(Thread):
         fall_counter = 0
         with self.cv:
             while not self.stop:
-                if not self.cv.wait(self.period):
+                # if not self.cv.wait(self.period):
+                if not self.cv.wait(0.5):
                     # there was a timeout (from a hard drop)
                     continue
                 fall_counter += 1
@@ -72,6 +75,7 @@ class Gravity(Thread):
                     self.game.translate(0)
                 elif self.soft_drop:
                     self.game.translate(0)
+                print('gravity says hi')
 
     def calculate_period(self):
         """
@@ -109,7 +113,7 @@ class Game:
     rot: int                    # {0:down=south, 1:down=east, 2:down=north, 3:down=west}
 
     gravity: Gravity
-    gui: GUI
+    gui = None
 
     @staticmethod
     def new_grid_row(num_cols: int):
@@ -118,11 +122,12 @@ class Game:
             row.append(Cell())
         return tuple(row)
 
-    def __init__(self, gui: GUI,
+    def __init__(self, gui,
                  shape_size: int = 4,
                  num_rows: int = None,
                  num_cols: int = None
                  ):
+        assert isinstance(gui, GUI)
         self.gui = gui
         self.shape_size = shape_size
 
@@ -145,12 +150,17 @@ class Game:
             for c in range(num_cols):
                 cell = Cell()
                 row.append(cell)
-                if r > 0:
+                if r is not 0:
                     grid[r-1][c].set_upstairs_neighbor(cell)
             grid.append(tuple(row))
         self.grid = tuple(grid)
 
-        self.next_shape = data.get_random_shape(shape_size)
+    def init(self):
+        """
+        Call after the calling canvas
+        is ready to be drawn shapes on
+        """
+        self.next_shape = data.get_random_shape(self.shape_size)
         self.spawn_next_shape()
 
         self.stockpile = []
@@ -241,8 +251,10 @@ class Game:
             y = self.pos.y0() + t.y0()
             if not self.grid[y][x].is_empty():
                 self.gravity.stop = True
+                self.gravity.cv.acquire()
                 self.gravity.cv.notify()
                 self.gui.game_over()
+                print('game over')
                 # TODO: END THE GAME HERE
                 return
 
@@ -344,10 +356,10 @@ class GUI(Frame):
         self.master = master
         self.pack()
 
-        self.set_color_scheme()
-        canvas = Canvas(self.master, bg=self.cs['bg'])
         game = Game(self)
         self.game = game
+        self.set_color_scheme()
+        canvas = Canvas(self.master, bg=self.cs['bg'])
 
         self.menu = Menu(master)
         master['menu'] = self.menu
@@ -358,16 +370,15 @@ class GUI(Frame):
         self.canvas['width'] = data.canvas_dmn(game.dmn.x0())
         for y in range(game.dmn.y0()):
             for x in range(game.dmn.x0()):
-                bbox = [0, 0, 0, 0]
-                bbox[0] = data.canvas_dmn(x)
-                bbox[1] = data.canvas_dmn(game.dmn.y0() - 1 - y)
-                bbox[2] = bbox[0] + data.GUI_CELL_WID
-                bbox[3] = bbox[1] + data.GUI_CELL_WID
+                x0 = data.canvas_dmn(x)
+                y0 = data.canvas_dmn(game.dmn.y0() - 1 - y)
                 item_id: int = self.canvas.create_rectangle(
-                    bbox=bbox, activebackground=self.cs[' '],
-                    tags='%d' % y, width=0
+                    x0, y0, x0 + data.GUI_CELL_WID, y0 + data.GUI_CELL_WID,
+                    fill=self.cs[' '], tags='%d' % y, width=0
                 )
                 game.grid[y][x].set_id(item_id)
+
+        self.game.init()
 
         self.virtual_kbd = Frame(self.master, bg=self.cs['bg'])
         self.virtual_kbd.pack(side='right')
@@ -386,7 +397,7 @@ class GUI(Frame):
                 )
             else:
                 self.canvas.itemconfigure(
-                    cell.id, fill=self.cs[g.curr_shape.name]
+                    cell.canvas_id, fill=self.cs[g.curr_shape.name]
                 )
 
     def game_over(self):
@@ -394,7 +405,7 @@ class GUI(Frame):
         return
 
     def set_color_scheme(self, cs_name: str = 'default'):
-        self.cs = data.COLOR_SCHEMES[self.game.shape_size][cs_name]
+        self.cs = data.get_color_scheme(self.game.shape_size, cs_name)
 
 
 def main():
