@@ -42,53 +42,6 @@ class Cell:
         return self.key is Cell.EMPTY
 
 
-class Gravity(Thread):
-    """
-    Calls soft drops and regular falling
-    """
-
-    game = None
-    period: float
-    soft_drop: bool = False
-    cv: Condition
-    stop: bool = False
-
-    def __init__(self, game, cv: Condition):
-        super(Gravity, self).__init__(daemon=True)
-
-        assert isinstance(game, Game)
-        self.game = game
-        self.calculate_period()
-        self.cv = cv
-
-    def run(self):
-        fall_counter = 0
-        with self.cv:
-            while not self.stop:
-                # if not self.cv.wait(self.period):
-                if not self.cv.wait(0.5):
-                    # there was a timeout (from a hard drop)
-                    continue
-                fall_counter += 1
-                if fall_counter is 2:
-                    fall_counter = 0
-                    self.game.translate(0)
-                elif self.soft_drop:
-                    self.game.translate(0)
-                print('gravity says hi')
-
-    def calculate_period(self):
-        """
-        hey! this is pretty neat:
-        with scalar = 1, base = 2, and offset = 16,
-        the inverse of this function is 16 times
-        a number from the period function
-        """
-        x = self.game.lines
-        self.period = (x + data.PERIOD_OFFSET + 1) / (data.PERIOD_OFFSET + 1)
-        self.period = data.PERIOD_SCALAR * log(self.period, data.PERIOD_BASE) + 1
-
-
 class Game:
     """
     Representation Invariant:
@@ -112,7 +65,6 @@ class Game:
     pos: Tile                   # position of the current shape's pivot
     rot: int                    # {0:down=south, 1:down=east, 2:down=north, 3:down=west}
 
-    gravity: Gravity
     gui = None
 
     @staticmethod
@@ -155,25 +107,17 @@ class Game:
             grid.append(tuple(row))
         self.grid = tuple(grid)
 
-    def init(self):
+        self.stockpile = []
+        for i in range(data.STOCKPILE_CAPACITY):
+            self.stockpile.append(None)
+
+    def init_curr_shape(self):
         """
         Call after the calling canvas
         is ready to be drawn shapes on
         """
         self.next_shape = data.get_random_shape(self.shape_size)
         self.spawn_next_shape()
-
-        self.stockpile = []
-        for i in range(data.STOCKPILE_CAPACITY):
-            self.stockpile.append(None)
-
-        self.gravity = Gravity(self, Condition())
-
-    def start(self):
-        """
-        Used to make gravity start applying
-        """
-        self.gravity.start()
 
     def stockpile_access(self, slot: int = 0):
         """
@@ -229,7 +173,7 @@ class Game:
             self.combo = 0
 
         self.score += data.calculate_score(lines_cleared + self.combo)
-        self.gravity.calculate_period()
+        self.gui.calculate_period()
 
         if lines_cleared is self.shape_size:
             self.combo += 1
@@ -250,9 +194,6 @@ class Game:
             x = self.pos.x0() + t.x0()
             y = self.pos.y0() + t.y0()
             if not self.grid[y][x].is_empty():
-                self.gravity.stop = True
-                self.gravity.cv.acquire()
-                self.gravity.cv.notify()
                 self.gui.game_over()
                 print('game over')
                 # TODO: END THE GAME HERE
@@ -324,9 +265,6 @@ class Game:
         while not_done:
             not_done = self.translate(0)
 
-        # wake up the wait() in self.gravity
-        self.gravity.cv.notify()
-
     def rotate_clockwise(self):
         self.rot += 1
         self.rot %= 4
@@ -336,17 +274,25 @@ class Game:
         self.rot %= 4
 
 
+class UserKey(Frame):
+    bind_id: int
+
+
 class GUI(Frame):
     """
 
     """
-    master: Frame       # top level frame
-    game: Game          #
-    cs: dict            # a map from color swatches to actual color values
+    master: Frame               # top level frame
+    game: Game                  #
+    cs: dict                    # a map from color swatches to actual color values
 
-    menu: Menu
-    canvas: Canvas
-    virtual_kbd: Frame  # emulates buttons used for playing
+    menu: Menu                  #
+    canvas: Canvas              #
+    virtual_kbd: Frame          # emulates buttons used for playing
+
+    period: int                 #
+    soft_drop: bool = False     #
+    after_id: int               #
 
     def __init__(self, master):
         """
@@ -358,6 +304,7 @@ class GUI(Frame):
 
         game = Game(self)
         self.game = game
+        self.calculate_period()
         self.set_color_scheme()
         canvas = Canvas(self.master, bg=self.cs['bg'])
 
@@ -378,7 +325,7 @@ class GUI(Frame):
                 )
                 game.grid[y][x].set_id(item_id)
 
-        self.game.init()
+        self.game.init_curr_shape()
 
         self.virtual_kbd = Frame(self.master, bg=self.cs['bg'])
         self.virtual_kbd.pack(side='right')
@@ -400,7 +347,49 @@ class GUI(Frame):
                     cell.canvas_id, fill=self.cs[g.curr_shape.name]
                 )
 
+    def calculate_period(self):
+        """
+        hey! this is pretty neat:
+        with scalar = 1, base = 2, and offset = 16,
+        the inverse of this function is 16 times
+        a number from the period function
+        """
+        x = self.game.lines
+        self.period = (x + data.PERIOD_OFFSET + 1) / (data.PERIOD_OFFSET + 1)
+        self.period = data.PERIOD_SCALAR * log(self.period, data.PERIOD_BASE) + 1
+        self.period *= 1000
+
+    def gravity(self, counter: int = 0):
+        counter += 1
+        if counter is data.PERIOD_GRANULARITY:
+            self.game.translate()
+            self.after_id = self.after(
+                self.period / data.PERIOD_GRANULARITY,
+                func=self.gravity()
+            )
+        sd_counter = floor(data.PERIOD_GRANULARITY * data.PERIOD_SOFT_DROP)
+        if self.soft_drop and (counter is sd_counter):
+            self.game.translate()
+            self.after_id = self.after(
+                self.period / data.PERIOD_GRANULARITY,
+                func=self.gravity(counter)
+            )
+
+    def start(self, event: Event):
+        self.gravity()
+        return
+
+    def set_soft_drop(self, event: Event):
+        # TODO if press, set True, if release, set False
+        return
+
+    def hard_drop(self, event: Event):
+        self.after_cancel(self.after_id)
+        self.game.hard_drop()
+        self.gravity()
+
     def game_over(self):
+        self.after_cancel(self.after_id)
         # TODO:
         return
 
@@ -414,7 +403,7 @@ def main():
     """
     root = tkinter.Tk()
     gui = GUI(root)
-    gui.game.start()  # TODO: make this by user input in the gui class
+    gui.start(None)  # TODO: make this by user input in the gui class
     gui.mainloop()
 
 

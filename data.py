@@ -59,9 +59,11 @@ def calculate_score(num_lines):
     return 2 * calculate_score(num_lines - 1) + 1
 
 
-PERIOD_SCALAR = 2.0      # must be > 0
-PERIOD_BASE = 2.0        # must be > 1
-PERIOD_OFFSET = 16.0     # must be > 0
+PERIOD_SCALAR = 2.0     # must be > 0
+PERIOD_BASE = 2.0       # must be > 1
+PERIOD_OFFSET = 16.0    # must be > 0
+PERIOD_SOFT_DROP = 0.5  # 0.0 < this < 1.0
+PERIOD_GRANULARITY = 1000
 
 NUM_ROWS = {
     4: 20
