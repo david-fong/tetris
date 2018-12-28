@@ -1,7 +1,8 @@
-from math import log
+from math import log, floor
 from threading import Thread, Condition
 
 import data
+from gui import GUI
 from shapes import *
 
 
@@ -16,9 +17,12 @@ class Cell:
     key: str
     upstairs_neighbor = None  # Another Cell object
 
-    def __init__(self, upstairs_neighbor=None):
+    def __init__(self):
         self.key = Cell.EMPTY
-        assert isinstance(upstairs_neighbor, Cell)
+
+    def set_upstairs_neighbor(self, upstairs_neighbor=None):
+        if upstairs_neighbor is not None:
+            assert isinstance(upstairs_neighbor, Cell)
         self.upstairs_neighbor = upstairs_neighbor
 
     def set_id(self, canvas_id: int):
@@ -26,7 +30,7 @@ class Cell:
 
     def catch_falling(self):
         if self.upstairs_neighbor is None:
-            self.key = None
+            self.clear()
         else:
             self.key = self.upstairs_neighbor.key
 
@@ -104,17 +108,21 @@ class Game:
     rot: int                    # {0:down=south, 1:down=east, 2:down=north, 3:down=west}
 
     gravity: Gravity
+    gui: GUI
 
     @staticmethod
     def new_grid_row(num_cols: int):
-        row = ()
+        row = []
         for c in range(num_cols):
-            row += Cell()
-        return row
+            row.append(Cell())
+        return tuple(row)
 
-    def __init__(self, shape_size: int = 4,
+    def __init__(self, gui: GUI,
+                 shape_size: int = 4,
                  num_rows: int = None,
-                 num_cols: int = None):
+                 num_cols: int = None
+                 ):
+        self.gui = gui
         self.shape_size = shape_size
 
         # use defaults or floor choices
@@ -130,9 +138,16 @@ class Game:
             num_cols = shape_size * 2
 
         self.dmn = Tile(num_cols, num_rows)
-        grid = ()
-        for row in range(num_rows):
-            grid += Game.new_grid_row(num_cols)
+        grid = []
+        for r in range(num_rows):
+            row = []
+            for c in range(num_cols):
+                cell = Cell()
+                row.append(cell)
+                if r > 0:
+                    grid[r-1][c].set_upstairs_neighbor(cell)
+            grid.append(tuple(row))
+        self.grid = tuple(grid)
 
         self.next_shape = data.get_random_shape(shape_size)
         self.spawn_next_shape()
@@ -140,9 +155,6 @@ class Game:
         self.stockpile = []
         for i in range(data.STOCKPILE_CAPACITY):
             self.stockpile.append(None)
-
-        self.pos = num_cols / 2
-        self.rot = 0
 
         self.gravity = Gravity(self, Condition())
 
@@ -171,9 +183,12 @@ class Game:
                 if not self.grid[y][x].is_empty():
                     return
 
+            # TODO: update the stockpile canvas
+            self.gui.draw_shape(erase=True)
             self.stockpile[slot] = self.curr_shape
             self.curr_shape = tmp
             self.rot = 0
+            self.gui.draw_shape()
 
     def handle_clears(self):
         """
@@ -181,14 +196,22 @@ class Game:
         updates the player's score, calculates the
         new period based on the new self.lines, and
         resets the timer.
+
+        always called at the end of set_curr_shape(),
+        just before calling spawn_next_shape().
         """
         lines_cleared = 0
         for y in range(self.dmn.y0() - self.ceil_len):
-            if not any(map(Cell.is_empty, self.grid[y])):
-                lines_cleared += 1
-                for line in self.grid[y:-1]:
-                    for cell in line:
-                        cell.catch_falling()
+            if any(map(Cell.is_empty, self.grid[y])):
+                continue
+            lines_cleared += 1
+            for line in self.grid[y:-1]:
+                for cell in line:
+                    cell.catch_falling()
+                    self.gui.canvas.itemconfigure(
+                        tagOrId=cell.canvas_id,
+                        fill=self.gui.cs[cell.key]
+                    )
         self.lines += lines_cleared
 
         if lines_cleared is not self.shape_size:
@@ -201,10 +224,14 @@ class Game:
             self.combo += 1
 
     def spawn_next_shape(self):
+        """
+        called once during initialization, and
+        always at the end of set_curr_shape().
+        """
         # get the pivot position for the next tile to spawn in
-        shape_ceil = max(map(Tile.y0, self.next_shape.bounds[2]))
+        shape_ceil = max(set(map(Tile.y0, self.next_shape.bounds[2])))
         spawn_y = self.dmn.y0() - 1 - self.ceil_len - shape_ceil
-        self.pos = Tile(self.dmn.x0() / 2, spawn_y)
+        self.pos = Tile(floor(self.dmn.x0() / 2), spawn_y)
         self.rot = 0
 
         # check if the next tile has room to spawn
@@ -214,12 +241,16 @@ class Game:
             if not self.grid[y][x].is_empty():
                 self.gravity.stop = True
                 self.gravity.cv.notify()
+                self.gui.game_over()
                 # TODO: END THE GAME HERE
                 return
 
         # didn't lose; pass on next shape to current shape
         self.curr_shape = self.next_shape
         self.next_shape = data.get_random_shape(self.shape_size)
+        self.gui.draw_shape()
+        # TODO: update next shape display:
+        #  self.gui.update_next_shape_canvas
 
     def set_curr_shape(self):
         """
@@ -238,7 +269,8 @@ class Game:
 
         self.spawn_next_shape()
 
-    def translate(self, direction: int = 0):
+    def translate(self, direction: int = 0,
+                  update_canvas: bool = True):
         """
         Automatically calls self.set_curr_shape()
         if at bottom. Returns True if a downward
@@ -256,18 +288,26 @@ class Game:
             if not self.grid[y][x].is_empty():
                 if direction == 0:
                     # the shape has something under itself:
+                    if not update_canvas:
+                        self.gui.draw_shape()
                     self.set_curr_shape()
                     return False
-                return True  # do not go through a wall
+                # do not go through a wall
+                return True
 
         # translation is valid; execute it
+        if update_canvas:
+            self.gui.draw_shape(erase=True)
         self.pos.x[0] += la_x[direction]
         self.pos.y[0] += la_y[direction]
+        if update_canvas:
+            self.gui.draw_shape()
         return True
 
     def hard_drop(self):
+        self.gui.draw_shape(erase=True)
         # translate down until hit bottom or another shape
-        not_done = self.translate(0)
+        not_done = self.translate(0, update_canvas=False)
         while not_done:
             not_done = self.translate(0)
 
