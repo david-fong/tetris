@@ -11,17 +11,18 @@ class Cell:
     Represents a shape's key, which
     can be used to get a color value.
     """
-    __EMPTY = None
+    EMPTY = None
+    canvas_id: int
     key: str
     upstairs_neighbor = None  # Another Cell object
 
     def __init__(self, upstairs_neighbor=None):
-        self.key = Cell.__EMPTY
+        self.key = Cell.EMPTY
         assert isinstance(upstairs_neighbor, Cell)
         self.upstairs_neighbor = upstairs_neighbor
 
-    def set(self, key: str):
-        self.key = key
+    def set_id(self, canvas_id: int):
+        self.canvas_id = canvas_id
 
     def catch_falling(self):
         if self.upstairs_neighbor is None:
@@ -29,8 +30,11 @@ class Cell:
         else:
             self.key = self.upstairs_neighbor.key
 
+    def clear(self):
+        self.key = Cell.EMPTY
+
     def is_empty(self):
-        return self.key is Cell.__EMPTY
+        return self.key is Cell.EMPTY
 
 
 class Gravity(Thread):
@@ -85,7 +89,7 @@ class Game:
     Start the game by calling self.start()
     """
     shape_size: int             # > 0. determines many of the following qualities
-    dimensions: Tile            # stores the number of rows in y and cols in x
+    dmn: Tile                   # stores the number of rows in y and cols in x
     grid: tuple                 # tuple of lists of shape keys (Cells)
     ceil_len: int = 0           # RI: must be < len(self.grid)
 
@@ -96,8 +100,8 @@ class Game:
     next_shape: Shape = None    # for player (helpful to them)
     curr_shape: Shape = None    # current shape falling & being controlled by the player
     stockpile: list             # RI: length should not exceed Data.STOCKPILE_CAPACITY
-    position: Tile              # position of the current shape's pivot
-    rotation: int               # {0:down=south, 1:down=east, 2:down=north, 3:down=west}
+    pos: Tile                   # position of the current shape's pivot
+    rot: int                    # {0:down=south, 1:down=east, 2:down=north, 3:down=west}
 
     gravity: Gravity
 
@@ -125,21 +129,20 @@ class Game:
         elif num_cols < shape_size * 2:
             num_cols = shape_size * 2
 
-        self.dimensions = Tile(num_cols, num_rows)
+        self.dmn = Tile(num_cols, num_rows)
         grid = ()
         for row in range(num_rows):
             grid += Game.new_grid_row(num_cols)
 
         self.next_shape = data.get_random_shape(shape_size)
-        self.curr_shape = data.get_random_shape(0)
-        self.set_curr_shape()
+        self.spawn_next_shape()
 
         self.stockpile = []
         for i in range(data.STOCKPILE_CAPACITY):
             self.stockpile.append(None)
 
-        self.position = num_cols / 2
-        self.rotation = 0
+        self.pos = num_cols / 2
+        self.rot = 0
 
         self.gravity = Gravity(self, Condition())
 
@@ -163,14 +166,14 @@ class Game:
         if tmp is not None:
             # check if the stock shape has room to be swapped-in:
             for t in tmp.tiles:
-                x = self.position.x0() + t.x0()
-                y = self.position.y0() + t.y0()
+                x = self.pos.x0() + t.x0()
+                y = self.pos.y0() + t.y0()
                 if not self.grid[y][x].is_empty():
                     return
 
             self.stockpile[slot] = self.curr_shape
             self.curr_shape = tmp
-            self.rotation = 0
+            self.rot = 0
 
     def handle_clears(self):
         """
@@ -180,7 +183,7 @@ class Game:
         resets the timer.
         """
         lines_cleared = 0
-        for y in range(self.dimensions.y0() - self.ceil_len):
+        for y in range(self.dmn.y0() - self.ceil_len):
             if not any(map(Cell.is_empty, self.grid[y])):
                 lines_cleared += 1
                 for line in self.grid[y:-1]:
@@ -197,31 +200,17 @@ class Game:
         if lines_cleared is self.shape_size:
             self.combo += 1
 
-    def set_curr_shape(self):
-        """
-        actions performed when a shape
-        contacts something underneath itself
-        """
-
-        # set the tile data for the shape in self.grid
-        for c in self.curr_shape.tiles:
-            x = self.position.x0() + c.x[self.rotation]
-            y = self.position.y0() + c.y[self.rotation]
-            self.grid[y][x].set(self.curr_shape.name)
-
-        # check if lines were cleared, handle if so
-        self.handle_clears()
-
+    def spawn_next_shape(self):
         # get the pivot position for the next tile to spawn in
         shape_ceil = max(map(Tile.y0, self.next_shape.bounds[2]))
-        spawn_y = self.dimensions.y0() - 1 - self.ceil_len - shape_ceil
-        self.position = Tile(self.dimensions.x0(), spawn_y)
-        self.rotation = 0
+        spawn_y = self.dmn.y0() - 1 - self.ceil_len - shape_ceil
+        self.pos = Tile(self.dmn.x0() / 2, spawn_y)
+        self.rot = 0
 
         # check if the next tile has room to spawn
         for t in self.next_shape.tiles:
-            x = self.position.x0() + t.x0()
-            y = self.position.y0() + t.y0()
+            x = self.pos.x0() + t.x0()
+            y = self.pos.y0() + t.y0()
             if not self.grid[y][x].is_empty():
                 self.gravity.stop = True
                 self.gravity.cv.notify()
@@ -232,6 +221,23 @@ class Game:
         self.curr_shape = self.next_shape
         self.next_shape = data.get_random_shape(self.shape_size)
 
+    def set_curr_shape(self):
+        """
+        actions performed when a shape
+        contacts something underneath itself
+        """
+
+        # set the tile data for the shape in self.grid
+        for c in self.curr_shape.tiles:
+            x = self.pos.x0() + c.x[self.rot]
+            y = self.pos.y0() + c.y[self.rot]
+            self.grid[y][x].set(self.curr_shape.name)
+
+        # check if lines were cleared, handle if so
+        self.handle_clears()
+
+        self.spawn_next_shape()
+
     def translate(self, direction: int = 0):
         """
         Automatically calls self.set_curr_shape()
@@ -241,12 +247,12 @@ class Game:
         """
         la_x = (0, 1, 0, -1)  # horizontal lookahead offsets
         la_y = (-1, 0, 1, 0)  # vertical lookahead offsets
-        angle = (self.rotation + direction) % 4
+        angle = (self.rot + direction) % 4
         bounds: tuple = self.curr_shape.bounds[angle]
 
         for t in bounds:
-            x = self.position.x0() + t.x[self.rotation] + la_x[direction]
-            y = self.position.y0() + t.y[self.rotation] + la_y[direction]
+            x = self.pos.x0() + t.x[self.rot] + la_x[direction]
+            y = self.pos.y0() + t.y[self.rot] + la_y[direction]
             if not self.grid[y][x].is_empty():
                 if direction == 0:
                     # the shape has something under itself:
@@ -255,8 +261,8 @@ class Game:
                 return True  # do not go through a wall
 
         # translation is valid; execute it
-        self.position.x[0] += la_x[direction]
-        self.position.y[0] += la_y[direction]
+        self.pos.x[0] += la_x[direction]
+        self.pos.y[0] += la_y[direction]
         return True
 
     def hard_drop(self):
@@ -269,9 +275,9 @@ class Game:
         self.gravity.cv.notify()
 
     def rotate_clockwise(self):
-        self.rotation += 1
-        self.rotation %= 4
+        self.rot += 1
+        self.rot %= 4
 
     def rotate_counterclockwise(self):
-        self.rotation += 3
-        self.rotation %= 4
+        self.rot += 3
+        self.rot %= 4

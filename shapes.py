@@ -34,7 +34,7 @@ class Tile:
         lt |= self.y[0] == other.y[0] and self.x[0] < other.y[0]
 
     def __repr__(self):
-        return '({}, {})'.format(self.x[0], self.y[0])
+        return 'tile:(% 0d, % 0d)' % (self.x[0], self.y[0])
 
     def x0(self):
         return self.x[0]
@@ -65,28 +65,31 @@ class Shape:
     def __init__(self, tiles: tuple, name: str = '?'):
         self.name = name
 
-        self.tiles = ()
+        self.tiles = []
         base = max(map(lambda px: px[0], tiles)) - min(map(lambda px: px[0], tiles))
         height = max(map(lambda py: py[1], tiles)) - min(map(lambda py: py[1], tiles))
         even_base = base % 2 == 0
         xor_encl_parity = even_base ^ (height % 2 == 0)
         for p in tiles:
-            self.tiles += Tile(p[0], p[1], xor_encl_parity, even_base)
+            self.tiles.append(Tile(p[0], p[1], xor_encl_parity, even_base))
+        self.tiles = tuple(self.tiles)
 
         self.bounds = ((), (), (), ())
-        bound_000 = ()
-        bound_180 = ()
+        bound_000 = []
+        bound_180 = []
         for x in set(map(Tile.x0, self.tiles)):
-            col = filter(lambda t: t.x == x, self.tiles)  # vertical slice
-            bound_000 += Tile(x, min(map(Tile.y0, col)))
-            bound_180 += Tile(x, max(map(Tile.y0, col)))
-        bound_270 = ()
-        bound_090 = ()
+            col = list(filter(lambda t: t.x[0] == x, self.tiles))  # vertical slice
+            print(col)
+            bound_000.append(Tile(x, min(map(Tile.y0, col))))
+            bound_180.append(Tile(x, max(map(Tile.y0, col))))
+        bound_270 = []
+        bound_090 = []
         for y in set(map(Tile.y0, self.tiles)):
-            row = filter(lambda t: t.y == y, self.tiles)  # horizontal slice
-            bound_270 += Tile(min(map(Tile.x0, row)), y)
-            bound_090 += Tile(max(map(Tile.x0, row)), y)
-        self.bounds = (bound_000, bound_090, bound_180, bound_270)
+            row = list(filter(lambda t: t.y[0] == y, self.tiles))  # horizontal slice
+            bound_270.append(Tile(min(map(Tile.x0, row)), y))
+            bound_090.append(Tile(max(map(Tile.x0, row)), y))
+        self.bounds = (tuple(bound_000), tuple(bound_090),
+                       tuple(bound_180), tuple(bound_270))
 
     def __eq__(self, other):
         if not isinstance(other, Shape):

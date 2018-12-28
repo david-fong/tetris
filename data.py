@@ -1,11 +1,12 @@
-from game import Shape, Game, Tile
+
 import random
 
+from game import Cell, Game
+from shapes import Shape
+
+BITMAP_PATH = '@'
 
 SHAPES = {
-    0: (
-        Shape((), None)
-    ),
     4: (
         Shape(((-1, 0), (0, 0), (1, 0), (2, 0)), 'I'),
         Shape(((-1, 0), (0, 0), (1, 0), (1, -1)), 'J'),
@@ -60,7 +61,7 @@ GUI_CELL_WID = 10
 GUI_CELL_PAD = 0
 
 
-def canvas_dimension(num_cells: int):
+def canvas_dmn(num_cells: int):
     result = GUI_CELL_WID + GUI_CELL_PAD
     result *= num_cells
     return result + GUI_CELL_PAD
