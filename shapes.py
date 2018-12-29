@@ -76,8 +76,8 @@ class Shape:
         self.name = name
 
         self.tiles = []
-        base = max(map(lambda px: px[0], pairs)) - min(map(lambda px: px[0], pairs))
-        height = max(map(lambda py: py[1], pairs)) - min(map(lambda py: py[1], pairs))
+        base = max(map(lambda px: px[0], pairs)) - min(map(lambda px: px[0], pairs)) + 1
+        height = max(map(lambda py: py[1], pairs)) - min(map(lambda py: py[1], pairs)) + 1
         even_base = base % 2 == 0
         xor_encl_parity = even_base ^ (height % 2 == 0)
         tiles = []
@@ -87,19 +87,21 @@ class Shape:
 
         bound_000 = []
         bound_180 = []
-        for x in set(map(Tile.x0, self.tiles)):
-            # get extremities of each vertical slice
+        # get extremities of each vertical slice
+        for x in sorted(list(set(map(Tile.x0, self.tiles)))):
             col = list(filter(lambda t: t.p[0].x == x, self.tiles))
-            bound_000.append(Tile(x, min(map(Tile.y0, col))))
-            bound_180.append(Tile(x, max(map(Tile.y0, col))))
+            col = sorted(col, key=lambda t: t.p[0].y)
+            bound_000.append(col[0])
+            bound_180.append(col[-1])
 
         bound_270 = []
         bound_090 = []
-        for y in set(map(Tile.y0, self.tiles)):
-            # get extremities of each horizontal slice
+        # get extremities of each horizontal slice
+        for y in sorted(list(set(map(Tile.y0, self.tiles)))):
             row = list(filter(lambda t: t.p[0].y == y, self.tiles))
-            bound_270.append(Tile(min(map(Tile.x0, row)), y))
-            bound_090.append(Tile(max(map(Tile.x0, row)), y))
+            row = sorted(row, key=lambda t: t.p[0].x)
+            bound_270.append(row[0])
+            bound_090.append(row[-1])
 
         self.bounds = (tuple(bound_000), tuple(bound_090),
                        tuple(bound_180), tuple(bound_270))

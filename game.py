@@ -13,7 +13,7 @@ class Cell:
     can be used to get a color value.
     """
     EMPTY = ' '
-    WALL = None
+    WALL = 'wall'
     canvas_id: int
     key: str
     upstairs_neighbor = None  # Another Cell object
@@ -133,18 +133,14 @@ class Game:
 
         lines_cleared = 0
         for y in range(self.dmn.y - self.ceil_len):
-            if any(map(Cell.is_empty, self.grid[y])):
+            if any(list(map(Cell.is_empty, self.grid[y]))):
                 continue
             if lowest_line is None:
                 lowest_line = y
             lines_cleared += 1
-            for line in self.grid[y]:
-                for cell in line:
-                    cell.catch_falling()
+            for cell in self.grid[y]:
+                cell.catch_falling()
         self.lines += lines_cleared
-
-        if lowest_line is None:
-            return None
 
         if lines_cleared is not self.shape_size:
             self.combo = 0
@@ -192,11 +188,7 @@ class Game:
         for t in bounds:
             t_p: Pair = t.p[self.rot].shift(direction)
             if not self.cell_at_tile(t_p).is_empty():
-                if direction is 0:
-                    # the shape has something under itself:
-                    return True
-                # do not go through a wall
-                return False
+                return direction is 0
 
         # translation is valid; execute it
         self.pos = self.pos.shift(direction)
@@ -261,6 +253,7 @@ class KeyFrame(Frame):
         rotate_cc = UserKey(top)
         rotate_cc.pack('left')
 
+
 class GUI(Frame):
     """
 
@@ -318,8 +311,13 @@ class GUI(Frame):
         self.virtual_kbd = Frame(self.master, bg=self.cs['bg'])
         self.virtual_kbd.pack(side='right')
 
-        # self.canvas.bind('<Button-1>', self.start)
-        self.master.bind('Key', self.decode_key)
+        self.canvas.bind('<Button-1>', self.start)
+        self.master.bind('a', self.translate_left)
+        self.master.bind('d', self.translate_right)
+        self.master.bind('q', self.rotate_counterclockwise)
+        self.master.bind('e', self.rotate_clockwise)
+        self.master.bind('w', self.hard_drop)
+        self.master.bind('s', self.translate_down)
 
     def draw_shape(self, erase: bool = False):
         """
@@ -352,6 +350,7 @@ class GUI(Frame):
         game = self.game
 
         # set the tile data for the shape in self.grid
+        self.draw_shape()
         key = game.curr_shape.name
         for t in game.curr_shape.tiles:
             game.cell_at_tile(t.p[game.rot]).key = key
@@ -406,33 +405,6 @@ class GUI(Frame):
         self.gravity()
         return
 
-    def decode_key(self, event):
-        bindings = {
-            'rotate_cc': 'q',
-            'rotate_cw': 'e',
-            'hard_drop': 'w',
-            'soft_drop': 's',
-            'move_left': 'a',
-            'move_right': 'd'
-        }
-        key: str = event.keysym
-        if key not in bindings.values():
-            return
-        self.draw_shape(erase=True)
-        if key is bindings['rotate_cc']:
-            self.game.rotate(3)
-        elif key is bindings['rotate_cw']:
-            self.game.rotate(1)
-        elif key is bindings['hard_drop']:
-            self.hard_drop()
-        elif key is bindings['soft_drop']:
-            return  # TODO
-        elif key is bindings['move_left']:
-            self.game.translate(3)
-        elif key is bindings['move_right']:
-            self.game.translate(1)
-        self.draw_shape()
-
     def stockpile_access(self, event: Event):
         self.draw_shape(erase=True)
 
@@ -442,19 +414,51 @@ class GUI(Frame):
         self.draw_shape()
         return
 
+    def rotate_clockwise(self, event: Event):
+        self.draw_shape(erase=True)
+        self.game.rotate(1)
+        self.draw_shape()
+        return
+
+    def rotate_counterclockwise(self, event: Event):
+        self.draw_shape(erase=True)
+        self.game.rotate(3)
+        self.draw_shape()
+        return
+
+    def translate_left(self, event: Event):
+        self.draw_shape(erase=True)
+        self.game.translate(3)
+        self.draw_shape()
+
+    def translate_right(self, event: Event):
+        self.draw_shape(erase=True)
+        self.game.translate(1)
+        self.draw_shape()
+
+    def translate_down(self, event: Event):
+        self.draw_shape(erase=True)
+        if self.game.translate():
+            if self.set_curr_shape():
+                self.game_over()
+        self.draw_shape()
+
     def set_soft_drop(self, event: Event):
         # TODO if press, set True, if release, set False
         return
 
-    def hard_drop(self):
-        self.after_cancel(self.gravity_after_id)
-        # translate down until hit bottom or another shape
-        not_done = self.game.translate()
-        while not_done:
-            not_done = self.game.translate()
+    def hard_drop(self, event: Event):
+        # self.after_cancel(self.gravity_after_id)  # TODO: fix after_cancel
+        self.draw_shape(erase=True)
 
+        # translate down until hit bottom or another shape
+        done = self.game.translate()
+        while not done:
+            done = self.game.translate()
+
+        self.draw_shape()
         self.set_curr_shape()
-        self.gravity()
+        # self.gravity()                            # TODO: fix after_cancel
         return
 
     def game_over(self):
