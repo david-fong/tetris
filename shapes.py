@@ -1,3 +1,6 @@
+from game import Pair
+
+
 class Tile:
     """
     Represents a coordinate pair, which
@@ -5,48 +8,44 @@ class Tile:
     offsets of a single tile in a shape
     from the shape's pivot.
     """
-
-    x: (int, int, int, int) = (0, 0, 0, 0)
-    y: (int, int, int, int) = (0, 0, 0, 0)
+    p: (Pair, Pair, Pair, Pair)
 
     def __init__(self, x: int, y: int, xor_encl_parity=False, even_base=False):
-        x_tmp = [x, y, -x, -y]
-        y_tmp = [y, -x, -y, x]
+        p = [Pair(x, y), Pair(y, -x), Pair(-x, -y), Pair(-y, x)]
         if even_base:
-            y_tmp[1] += 1
-            y_tmp[2] += 1
-            x_tmp[2] += 1
-            x_tmp[3] += 1
-        if xor_encl_parity:  # not even-sided square enclosure
-            y_tmp[2] -= 1
-        self.x = tuple(x_tmp)
-        self.y = tuple(y_tmp)
+            p[1].y += 1
+            p[2].y += 1
+            p[2].x += 1
+            p[3].x += 1
+        if xor_encl_parity:
+            p[2].y -= 1
+        self.p = tuple(p)
 
     def __eq__(self, other):
         if not isinstance(other, Tile):
             return False
-        return self.x[0] == other.x[0] and self.y[0] == other.y[0]
+        return self.p[0].x == other.p[0].x and self.p[0].y == other.p[0].y
 
     def __lt__(self, other):
         if not isinstance(other, Tile):
             return True
-        lt = (self.y[0] < other.y[0])
-        lt |= self.y[0] == other.y[0] and self.x[0] < other.y[0]
+        lt = (self.p[0].y < other.p[0].y)
+        lt |= self.p[0].y == other.p[0].y and self.p[0].x < other.p[0].x
 
     def __repr__(self):
-        return '(% d, % d)' % (self.x[0], self.y[0])
+        return '(% d, % d)' % (self.p[0].x, self.p[0].y)
 
     def x0(self):
-        return self.x[0]
+        return self.p[0].x
 
     def y0(self):
-        return self.y[0]
+        return self.p[0].y
 
     def x_(self, rot: int):
-        return self.x[rot]
+        return self.p[rot].y
 
     def y_(self, rot: int):
-        return self.y[rot]
+        return self.p[rot].y
 
 
 class Shape:

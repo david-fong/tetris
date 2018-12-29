@@ -12,7 +12,8 @@ class Cell:
     Represents a shape's key, which
     can be used to get a color value.
     """
-    EMPTY = None
+    EMPTY = ' '
+    WALL = None
     canvas_id: int
     key: str
     upstairs_neighbor = None  # Another Cell object
@@ -50,6 +51,11 @@ class Pair:
     def __init__(self, x: int, y: int):
         self.x = x
         self.y = y
+
+    def shift(self, direction: int):
+        la_x = (0, 1, 0, -1)  # horizontal lookahead offsets
+        la_y = (-1, 0, 1, 0)  # vertical lookahead offsets
+        return Pair(self.x + la_x[direction], self.y + la_y[direction])
 
 
 class Game:
@@ -130,9 +136,7 @@ class Game:
 
         # check if the stock shape has room to be swapped-in:
         for t in tmp.tiles:
-            x = self.pos.x + t.x0()
-            y = self.pos.y + t.y0()
-            if not self.grid[y][x].is_empty():
+            if not self.cell_at_tile(t.p[0]).is_empty():
                 return
 
         self.stockpile[slot] = self.curr_shape
@@ -187,15 +191,12 @@ class Game:
         # get the pivot position for the next tile to spawn in
         shape_ceil = max(map(Tile.y0, self.next_shape.bounds[2]))
         spawn_y = self.dmn.y - 1 - self.ceil_len - shape_ceil
-        print(spawn_y)
         self.pos = Pair(floor(self.dmn.x / 2) - 1, spawn_y)
         self.rot = 0
 
         # check if the next tile has room to spawn
         for t in self.next_shape.tiles:
-            x = self.pos.x + t.x0()
-            y = self.pos.y + t.y0()
-            if not self.grid[y][x].is_empty():
+            if not self.cell_at_tile(t.p[self.rot]).is_empty():
                 return True
 
         # didn't lose; pass on next shape to current shape
@@ -210,36 +211,39 @@ class Game:
         ie. the host gui must call
         self.game.set_curr_shape()
         """
-        la_x = (0, 1, 0, -1)  # horizontal lookahead offsets
-        la_y = (-1, 0, 1, 0)  # vertical lookahead offsets
         angle = (self.rot + direction) % 4
         bounds: tuple = self.curr_shape.bounds[angle]
 
         for t in bounds:
-            x = self.pos.x + t.x[self.rot] + la_x[direction]
-            y = self.pos.y + t.y[self.rot] + la_y[direction]
-            if ((not self.grid[y][x].is_empty())
-                    or (x < 0 or x >= self.dmn.x)
-                    or (y < 0 or y >= self.dmn.y)):
-                if direction == 0:
+            t_p: Pair = t.p[self.rot].shift(direction)
+            if not self.cell_at_tile(t_p).is_empty():
+                if direction is 0:
                     # the shape has something under itself:
                     return True
                 # do not go through a wall
                 return False
 
         # translation is valid; execute it
-        self.pos.x += la_x[direction]
-        self.pos.y += la_y[direction]
+        self.pos = self.pos.shift(direction)
         return False
 
-    def rotate_clockwise(self):
-        self.rot += 1
-        self.rot %= 4
+    def rotate(self, angle: int):
+        """
+        returns True if the rotation is allowed
+        """
+        rot = (self.rot + angle) % 4
+        for t in self.curr_shape.tiles:
+            if not self.cell_at_tile(t.p[rot]).is_empty():
+                return False
+        return True
 
-    def rotate_counterclockwise(self):
-        self.rot += 3
-        self.rot %= 4
-
+    def cell_at_tile(self, p: Pair):
+        x = self.pos.x + p.x
+        y = self.pos.y + p.y
+        if x < 0 or x >= self.dmn.x or y < 0 or y >= self.dmn.y:
+            return Cell.WALL
+        else:
+            return self.grid[y][x]
 
 class UserKey(Frame):
     bind_id: int
@@ -382,6 +386,18 @@ class GUI(Frame):
         slot: int  # TODO
         self.game.stockpile_access(slot)
 
+        self.draw_shape()
+        return
+
+    def rotate_clockwise(self, event: Event):
+        self.draw_shape(erase=True)
+        self.game.rotate(1)
+        self.draw_shape()
+        return
+
+    def rotate_counterclockwise(self, event: Event):
+        self.draw_shape(erase=True)
+        self.game.rotate(3)
         self.draw_shape()
         return
 
