@@ -63,7 +63,7 @@ PERIOD_SCALAR = 2.0     # must be > 0
 PERIOD_BASE = 2.0       # must be > 1
 PERIOD_OFFSET = 16.0    # must be > 0
 PERIOD_SOFT_DROP = 0.5  # 0.0 < this < 1.0
-PERIOD_GRANULARITY = 1000
+PERIOD_GRANULARITY = 2
 
 NUM_ROWS = {
     4: 20
@@ -73,12 +73,13 @@ NUM_COLS = {
     4: 10
 }
 
-GUI_CELL_WID = 20
-GUI_CELL_PAD = 2
+GUI_CELL_WID: int = 20
+GUI_CELL_PAD: int = 2
 
 
 def canvas_dmn(num_cells: int):
-    result = GUI_CELL_WID + GUI_CELL_PAD
+    assert isinstance(num_cells, int)
+    result: int = GUI_CELL_WID + GUI_CELL_PAD
     result *= num_cells
     return result + GUI_CELL_PAD
 
