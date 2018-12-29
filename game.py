@@ -224,15 +224,42 @@ class Game:
             return self.grid[y][x]
 
 
-class UserKey(Frame):
+class UserKey(Button):
     bind_id: int
     master: Frame
     button: Button
 
-    def __init__(self, master: Frame):
+    def __init__(self, master: Frame, key: str, command):
         super().__init__(master)
         self.master = master
 
+        self.configure(
+            command=command,
+            height=data.GUI_CELL_WID,
+            width=data.GUI_CELL_WID,
+            bg='white',
+            text='key'
+        )
+
+
+class KeyFrame(Frame):
+    master: Frame
+    rotate_cc: UserKey
+    rotate_cw: UserKey
+    hard_drop: UserKey
+    soft_drop: UserKey
+    move_left: UserKey
+    move_right: UserKey
+
+    def __init__(self, master: Frame):
+        super().__init__(master)
+        self.master = master
+        self.pack()
+
+        top = Frame(self)
+        top.pack('top')
+        rotate_cc = UserKey(top)
+        rotate_cc.pack('left')
 
 class GUI(Frame):
     """
@@ -256,6 +283,7 @@ class GUI(Frame):
         """
         super().__init__(master)
         self.master = master
+        self.focus_set()
         self.pack()
 
         game = Game(self)
@@ -271,6 +299,7 @@ class GUI(Frame):
         self.canvas.pack(side='left')
         self.canvas['height'] = data.canvas_dmn(game.dmn.y)
         self.canvas['width'] = data.canvas_dmn(game.dmn.x)
+        self.canvas['relief'] = 'flat'
         for y in range(game.dmn.y):
             for x in range(game.dmn.x):
                 x0 = data.canvas_dmn(x)
@@ -289,7 +318,8 @@ class GUI(Frame):
         self.virtual_kbd = Frame(self.master, bg=self.cs['bg'])
         self.virtual_kbd.pack(side='right')
 
-        self.canvas.bind('<Enter>', self.start)
+        # self.canvas.bind('<Button-1>', self.start)
+        self.master.bind('Key', self.decode_key)
 
     def draw_shape(self, erase: bool = False):
         """
@@ -367,14 +397,41 @@ class GUI(Frame):
                 self.set_curr_shape()
             else:
                 self.draw_shape()
-        self.gravity_after_id = self.after(
-            ms=int(self.period / gran),
+        self.gravity_after_id = self.canvas.after(
+            ms=(self.period / gran),
             func=self.gravity(counter)
         )
 
     def start(self, event: Event):
         self.gravity()
         return
+
+    def decode_key(self, event):
+        bindings = {
+            'rotate_cc': 'q',
+            'rotate_cw': 'e',
+            'hard_drop': 'w',
+            'soft_drop': 's',
+            'move_left': 'a',
+            'move_right': 'd'
+        }
+        key: str = event.keysym
+        if key not in bindings.values():
+            return
+        self.draw_shape(erase=True)
+        if key is bindings['rotate_cc']:
+            self.game.rotate(3)
+        elif key is bindings['rotate_cw']:
+            self.game.rotate(1)
+        elif key is bindings['hard_drop']:
+            self.hard_drop()
+        elif key is bindings['soft_drop']:
+            return  # TODO
+        elif key is bindings['move_left']:
+            self.game.translate(3)
+        elif key is bindings['move_right']:
+            self.game.translate(1)
+        self.draw_shape()
 
     def stockpile_access(self, event: Event):
         self.draw_shape(erase=True)
@@ -385,32 +442,17 @@ class GUI(Frame):
         self.draw_shape()
         return
 
-    def rotate_clockwise(self, event: Event):
-        self.draw_shape(erase=True)
-        self.game.rotate(1)
-        self.draw_shape()
-        return
-
-    def rotate_counterclockwise(self, event: Event):
-        self.draw_shape(erase=True)
-        self.game.rotate(3)
-        self.draw_shape()
-        return
-
     def set_soft_drop(self, event: Event):
         # TODO if press, set True, if release, set False
         return
 
-    def hard_drop(self, event: Event):
+    def hard_drop(self):
         self.after_cancel(self.gravity_after_id)
-        self.draw_shape(erase=True)
-
         # translate down until hit bottom or another shape
         not_done = self.game.translate()
         while not_done:
             not_done = self.game.translate()
 
-        self.draw_shape()
         self.set_curr_shape()
         self.gravity()
         return

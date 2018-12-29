@@ -28,6 +28,7 @@ COLOR_SCHEMES = {
     4: {
         'default': {
             'bg': 'black',
+            'key': 'white',
             ' ': 'black',
             'I': 'cyan',
             'J': 'blue',
@@ -87,9 +88,7 @@ GUI_CELL_PAD: int = 2
 
 def canvas_dmn(num_cells: int):
     assert isinstance(num_cells, int)
-    result: int = GUI_CELL_WID + GUI_CELL_PAD
-    result *= num_cells
-    return result + GUI_CELL_PAD
+    return num_cells * (GUI_CELL_WID + GUI_CELL_PAD) + 2 * GUI_CELL_PAD
 
 
 STOCKPILE_CAPACITY = 4
