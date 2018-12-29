@@ -1,4 +1,5 @@
 import random
+from math import log
 
 from shapes import Shape
 
@@ -59,11 +60,18 @@ def calculate_score(num_lines):
     return 2 * calculate_score(num_lines - 1) + 1
 
 
-PERIOD_SCALAR = 2.0     # must be > 0
-PERIOD_BASE = 2.0       # must be > 1
-PERIOD_OFFSET = 16.0    # must be > 0
+FREQ_SCALAR = 2.0       # must be > 0
+FREQ_BASE = 2.0         # must be > 1
+FREQ_OFFSET = 16.0      # must be > 0
 PERIOD_SOFT_DROP = 0.5  # 0.0 < this < 1.0
 PERIOD_GRANULARITY = 2
+
+
+def get_period(num_lines: int = 0):
+    freq = (num_lines + FREQ_OFFSET + 1) / (FREQ_OFFSET + 1)
+    freq = FREQ_SCALAR * log(freq, FREQ_BASE) + 1
+    return 1000 / freq
+
 
 NUM_ROWS = {
     4: 20

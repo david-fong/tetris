@@ -1,4 +1,15 @@
-from game import Pair
+class Pair:
+    x: int
+    y: int
+
+    def __init__(self, x: int, y: int):
+        self.x = x
+        self.y = y
+
+    def shift(self, direction: int):
+        la_x = (0, 1, 0, -1)  # horizontal lookahead offsets
+        la_y = (-1, 0, 1, 0)  # vertical lookahead offsets
+        return Pair(self.x + la_x[direction], self.y + la_y[direction])
 
 
 class Tile:
@@ -78,7 +89,7 @@ class Shape:
         bound_180 = []
         for x in set(map(Tile.x0, self.tiles)):
             # get extremities of each vertical slice
-            col = list(filter(lambda t: t.x[0] == x, self.tiles))
+            col = list(filter(lambda t: t.p[0].x == x, self.tiles))
             bound_000.append(Tile(x, min(map(Tile.y0, col))))
             bound_180.append(Tile(x, max(map(Tile.y0, col))))
 
@@ -86,7 +97,7 @@ class Shape:
         bound_090 = []
         for y in set(map(Tile.y0, self.tiles)):
             # get extremities of each horizontal slice
-            row = list(filter(lambda t: t.y[0] == y, self.tiles))
+            row = list(filter(lambda t: t.p[0].y == y, self.tiles))
             bound_270.append(Tile(min(map(Tile.x0, row)), y))
             bound_090.append(Tile(max(map(Tile.x0, row)), y))
 

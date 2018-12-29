@@ -1,6 +1,6 @@
-from math import log, floor
+from math import floor
 import tkinter
-from tkinter import Frame, Canvas, Menu, Event, colorchooser
+from tkinter import Frame, Canvas, Button, Menu, Event, colorchooser
 
 import data
 from shapes import *
@@ -18,16 +18,13 @@ class Cell:
     key: str
     upstairs_neighbor = None  # Another Cell object
 
-    def __init__(self):
-        self.key = Cell.EMPTY
+    def __init__(self, key: str = EMPTY):
+        self.key = key
 
     def set_upstairs_neighbor(self, upstairs_neighbor=None):
         if upstairs_neighbor is not None:
             assert isinstance(upstairs_neighbor, Cell)
         self.upstairs_neighbor = upstairs_neighbor
-
-    def set_id(self, canvas_id: int):
-        self.canvas_id = canvas_id
 
     def catch_falling(self):
         """recursive"""
@@ -44,27 +41,11 @@ class Cell:
         return self.key is Cell.EMPTY
 
 
-class Pair:
-    x: int
-    y: int
-
-    def __init__(self, x: int, y: int):
-        self.x = x
-        self.y = y
-
-    def shift(self, direction: int):
-        la_x = (0, 1, 0, -1)  # horizontal lookahead offsets
-        la_y = (-1, 0, 1, 0)  # vertical lookahead offsets
-        return Pair(self.x + la_x[direction], self.y + la_y[direction])
-
-
 class Game:
     """
     Representation Invariant:
     any entry in the tuple 'grid' must be a list
     of length num_cols- an initializing parameter.
-
-    Start the game by calling self.start()
     """
     shape_size: int             # > 0. determines many of the following qualities
     dmn: Pair                   # stores the number of rows in y and cols in x
@@ -145,13 +126,8 @@ class Game:
 
     def handle_clears(self):
         """
-        shifts all lines above those cleared down.
-        updates the player's score, calculates the
-        new period based on the new self.lines, and
-        resets the timer.
-
-        always called at the end of set_curr_shape(),
-        just before calling spawn_next_shape().
+        makes lines above cleared lines fall.
+        updates the player's score.
         """
         lowest_line = None
 
@@ -173,7 +149,6 @@ class Game:
         if lines_cleared is not self.shape_size:
             self.combo = 0
         self.score += data.calculate_score(lines_cleared + self.combo)
-        self.gui.calculate_period()
         if lines_cleared is self.shape_size:
             self.combo += 1
 
@@ -229,24 +204,34 @@ class Game:
 
     def rotate(self, angle: int):
         """
-        returns True if the rotation is allowed
+        returns True and performs the
+        rotation if it is allowed
         """
         rot = (self.rot + angle) % 4
         for t in self.curr_shape.tiles:
             if not self.cell_at_tile(t.p[rot]).is_empty():
                 return False
+
+        self.rot = rot
         return True
 
     def cell_at_tile(self, p: Pair):
         x = self.pos.x + p.x
         y = self.pos.y + p.y
         if x < 0 or x >= self.dmn.x or y < 0 or y >= self.dmn.y:
-            return Cell.WALL
+            return Cell(Cell.WALL)
         else:
             return self.grid[y][x]
 
+
 class UserKey(Frame):
     bind_id: int
+    master: Frame
+    button: Button
+
+    def __init__(self, master: Frame):
+        super().__init__(master)
+        self.master = master
 
 
 class GUI(Frame):
@@ -261,9 +246,9 @@ class GUI(Frame):
     canvas: Canvas              #
     virtual_kbd: Frame          # emulates buttons used for playing
 
-    period: int                 #
+    period: float               #
     soft_drop: bool = False     #
-    gravity_after_id: int       #
+    gravity_after_id = None     # Alarm identifier for after_cancel()
 
     def __init__(self, master):
         """
@@ -275,7 +260,7 @@ class GUI(Frame):
 
         game = Game(self)
         self.game = game
-        self.calculate_period()
+        self.period = data.get_period()
         self.set_color_scheme()
         canvas = Canvas(self.master, bg=self.cs['bg'])
 
@@ -304,14 +289,17 @@ class GUI(Frame):
         self.virtual_kbd = Frame(self.master, bg=self.cs['bg'])
         self.virtual_kbd.pack(side='right')
 
+        self.canvas.bind('<Enter>', self.start)
+
     def draw_shape(self, erase: bool = False):
+        """
+        requires that the current Shape is in the grid
+        such that all corresponding Cell objects exist.
+        """
         game = self.game
         key: str = game.curr_shape.name
-        t: Tile
         for t in game.curr_shape.tiles:
-            x = game.pos.x + t.x[game.rot]
-            y = game.pos.y + t.y[game.rot]
-            cell = game.grid[y][x]
+            cell = game.cell_at_tile(t.p[game.rot])
             if erase:
                 cell.clear()
                 self.canvas.itemconfigure(
@@ -327,52 +315,60 @@ class GUI(Frame):
         """
         actions performed when a shape
         contacts something underneath itself
+
+        call whenever a call to
+        Game.translate() returns True
         """
         game = self.game
 
         # set the tile data for the shape in self.grid
         key = game.curr_shape.name
         for t in game.curr_shape.tiles:
-            x = game.pos.x + t.x[game.rot]
-            y = game.pos.y + t.y[game.rot]
-            game.grid[y][x].key = key
+            game.cell_at_tile(t.p[game.rot]).key = key
 
         # check if lines were cleared, handle if so
-        self.handle_clears()
+        y = self.game.handle_clears()
+        if y is not None:
+            # Calculate the value to use as a period
+            #  based on the total number of lines cleared
+            self.period = data.get_period(self.game.lines)
+            # Update the canvas
+            for line in self.game.grid[y:self.game.dmn.y - self.game.ceil_len]:
+                for cell in line:
+                    self.canvas.itemconfigure(
+                        tagOrId=cell.canvas_id,
+                        fill=self.cs[cell.key]
+                    )
 
+        # Check to see if the game is over:
         if self.game.spawn_next_shape():
-            # The game is over
             self.draw_shape()
             self.game_over()
-        self.draw_shape()
-        # TODO: update next shape display:
-        #  self.gui.update_next_shape_canvas
-
-    def calculate_period(self):
-        """
-        hey! this is pretty neat:
-        with scalar = 1, base = 2, and offset = 16,
-        the inverse of this function is 16 times
-        a number from the period function
-        """
-        x = self.game.lines
-        self.period = (x + data.PERIOD_OFFSET + 1) / (data.PERIOD_OFFSET + 1)
-        self.period = data.PERIOD_SCALAR * log(self.period, data.PERIOD_BASE) + 1
-        self.period = 1000 / self.period
-        print(self.period)
-        return
+        else:
+            self.draw_shape()
+            # TODO: update next shape display:
+            #  self.gui.update_next_shape_canvas
 
     def gravity(self, counter: int = 0):
+        """
+        polling function that makes the
+        current shape periodically fall
+        """
         gran = data.PERIOD_GRANULARITY
         counter += 1
         sd_counter = floor(gran * data.PERIOD_SOFT_DROP)
         if counter is gran or (self.soft_drop and counter % sd_counter is 0):
             counter = 0
+            print('drop')
+            self.draw_shape(erase=True)
             if self.game.translate():
+                self.draw_shape()
+                print('and set!')
                 self.set_curr_shape()
-
+            else:
+                self.draw_shape()
         self.gravity_after_id = self.after(
-            ms=(self.period / gran),
+            ms=int(self.period / gran),
             func=self.gravity(counter)
         )
 
@@ -415,12 +411,14 @@ class GUI(Frame):
             not_done = self.game.translate()
 
         self.draw_shape()
+        self.set_curr_shape()
         self.gravity()
         return
 
     def game_over(self):
-        self.after_cancel(self.gravity_after_id)
+        print(self.gravity_after_id)
         self.canvas.configure(bg='red')
+        self.after_cancel(self.gravity_after_id)
         # TODO:
         return
 
@@ -434,7 +432,6 @@ def main():
     """
     root = tkinter.Tk()
     gui = GUI(root)
-    gui.start(None)  # TODO: make this by user input in the gui class
     gui.mainloop()
 
 
