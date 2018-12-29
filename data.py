@@ -20,6 +20,9 @@ def get_random_shape(shape_size):
     return random.choice(SHAPES[shape_size])
 
 
+CELL_EMPTY_KEY = ' '
+CELL_WALL_KEY = 'wall'
+
 """
 All sizes must have a 
 color scheme with key='default'
@@ -29,7 +32,7 @@ COLOR_SCHEMES = {
         'default': {
             'bg': 'black',
             'key': 'white',
-            ' ': 'black',
+            CELL_EMPTY_KEY: 'black',
             'I': 'cyan',
             'J': 'blue',
             'L': 'orange',

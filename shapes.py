@@ -70,7 +70,7 @@ class Shape:
 
     name: str
     tiles: (int, int, int, int)
-    bounds: (tuple, tuple, tuple, tuple)
+    faces: (tuple, tuple, tuple, tuple)
 
     def __init__(self, pairs: tuple, name: str = '?'):
         self.name = name
@@ -85,26 +85,32 @@ class Shape:
             tiles.append(Tile(p[0], p[1], xor_encl_parity, even_base))
         self.tiles = tuple(tiles)
 
-        bound_000 = []
-        bound_180 = []
+        face_000 = []
+        face_180 = []
         # get extremities of each vertical slice
         for x in sorted(list(set(map(Tile.x0, self.tiles)))):
             col = list(filter(lambda t: t.p[0].x == x, self.tiles))
-            col = sorted(col, key=lambda t: t.p[0].y)
-            bound_000.append(col[0])
-            bound_180.append(col[-1])
+            col.sort(key=Tile.y0)
+            face_000.append(col[0])
+            face_180.append(col[-1])
+        # sort faces by decreasing extremity
+        face_000.sort(key=Tile.y0)
+        face_180.sort(key=Tile.y0, reverse=True)
 
-        bound_270 = []
-        bound_090 = []
+        face_270 = []
+        face_090 = []
         # get extremities of each horizontal slice
         for y in sorted(list(set(map(Tile.y0, self.tiles)))):
             row = list(filter(lambda t: t.p[0].y == y, self.tiles))
-            row = sorted(row, key=lambda t: t.p[0].x)
-            bound_270.append(row[0])
-            bound_090.append(row[-1])
+            row.sort(key=Tile.x0)
+            face_270.append(row[0])
+            face_090.append(row[-1])
+        # sort faces by decreasing extremity
+        face_270.sort(key=Tile.x0)
+        face_090.sort(key=Tile.x0, reverse=True)
 
-        self.bounds = (tuple(bound_000), tuple(bound_090),
-                       tuple(bound_180), tuple(bound_270))
+        self.faces = (tuple(face_000), tuple(face_090),
+                      tuple(face_180), tuple(face_270))
 
     def __eq__(self, other):
         if not isinstance(other, Shape):
@@ -115,3 +121,11 @@ class Shape:
             if t not in other.tiles:
                 return False
         return True
+
+    def extreme(self, rot: int, direction: int):
+        tile = self.faces[(rot + direction) % 4][0]
+        pair = tile.p[rot]
+        if direction % 2 is 0:
+            return pair.y
+        else:
+            return pair.x

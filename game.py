@@ -12,13 +12,11 @@ class Cell:
     Represents a shape's key, which
     can be used to get a color value.
     """
-    EMPTY = ' '
-    WALL = 'wall'
     canvas_id: int
     key: str
     upstairs_neighbor = None  # Another Cell object
 
-    def __init__(self, key: str = EMPTY):
+    def __init__(self, key: str = data.CELL_EMPTY_KEY):
         self.key = key
 
     def set_upstairs_neighbor(self, upstairs_neighbor=None):
@@ -35,10 +33,13 @@ class Cell:
             self.upstairs_neighbor.catch_falling()
 
     def clear(self):
-        self.key = Cell.EMPTY
+        self.key = data.CELL_EMPTY_KEY
 
     def is_empty(self):
-        return self.key is Cell.EMPTY
+        return self.key is data.CELL_EMPTY_KEY
+
+    def __str__(self):
+        return ' ' + self.key
 
 
 class Game:
@@ -101,6 +102,10 @@ class Game:
         for i in range(data.STOCKPILE_CAPACITY):
             self.stockpile.append(None)
 
+        # spawn the first shape
+        self.next_shape = data.get_random_shape(self.shape_size)
+        self.spawn_next_shape()
+
     def stockpile_access(self, slot: int = 0):
         """
         switches the current shape with another
@@ -132,15 +137,20 @@ class Game:
         lowest_line = None
 
         lines_cleared = 0
-        for y in range(self.dmn.y - self.ceil_len):
+        y = 0
+        range_ = self.dmn.y - self.ceil_len
+        while y < range_:
             if any(list(map(Cell.is_empty, self.grid[y]))):
+                y += 1
                 continue
+            lines_cleared += 1
+            range_ -= 1
             if lowest_line is None:
                 lowest_line = y
-            lines_cleared += 1
             for cell in self.grid[y]:
                 cell.catch_falling()
         self.lines += lines_cleared
+        print(str(self))
 
         if lines_cleared is not self.shape_size:
             self.combo = 0
@@ -159,11 +169,11 @@ class Game:
         the next shape to spawn and the host
         gui must end the game.
         """
-        # get the pivot position for the next tile to spawn in
-        shape_ceil = max(map(Tile.y0, self.next_shape.bounds[2]))
-        spawn_y = self.dmn.y - 1 - self.ceil_len - shape_ceil
-        self.pos = Pair(floor(self.dmn.x / 2) - 1, spawn_y)
         self.rot = 0
+        # get the pivot position for the next tile to spawn in
+        shape_ceil = self.next_shape.extreme(self.rot, 2)
+        spawn_y = self.dmn.y - (1 + self.ceil_len + shape_ceil)
+        self.pos = Pair(floor(self.dmn.x / 2) - 1, spawn_y)
 
         # check if the next tile has room to spawn
         for t in self.next_shape.tiles:
@@ -183,9 +193,7 @@ class Game:
         self.game.set_curr_shape()
         """
         angle = (self.rot + direction) % 4
-        bounds: tuple = self.curr_shape.bounds[angle]
-
-        for t in bounds:
+        for t in self.curr_shape.faces[angle]:
             t_p: Pair = t.p[self.rot].shift(direction)
             if not self.cell_at_tile(t_p).is_empty():
                 return direction is 0
@@ -211,9 +219,17 @@ class Game:
         x = self.pos.x + p.x
         y = self.pos.y + p.y
         if x < 0 or x >= self.dmn.x or y < 0 or y >= self.dmn.y:
-            return Cell(Cell.WALL)
+            return Cell(data.CELL_WALL_KEY)
         else:
             return self.grid[y][x]
+
+    def __str__(self):
+        to_string = ''
+        for line in reversed(self.grid):
+            for cell in line:
+                to_string += str(cell)
+            to_string += '\n'
+        return to_string
 
 
 class UserKey(Button):
@@ -221,27 +237,25 @@ class UserKey(Button):
     master: Frame
     button: Button
 
-    def __init__(self, master: Frame, key: str, command):
+    def __init__(self, master: Frame):
         super().__init__(master)
         self.master = master
 
         self.configure(
-            command=command,
             height=data.GUI_CELL_WID,
             width=data.GUI_CELL_WID,
             bg='white',
             text='key'
         )
 
+    def bind(self, sequence=None, func=None, add=None):
+        self.configure(command=func)
+        return  # TODO
+
 
 class KeyFrame(Frame):
     master: Frame
-    rotate_cc: UserKey
-    rotate_cw: UserKey
-    hard_drop: UserKey
-    soft_drop: UserKey
-    move_left: UserKey
-    move_right: UserKey
+    mappings: dict
 
     def __init__(self, master: Frame):
         super().__init__(master)
@@ -252,6 +266,15 @@ class KeyFrame(Frame):
         top.pack('top')
         rotate_cc = UserKey(top)
         rotate_cc.pack('left')
+
+        self.mappings = {
+            'rotate_cc': UserKey,
+            'rotate_cw': UserKey,
+            'hard_drop': UserKey,
+            'soft_drop': UserKey,
+            'move_left': UserKey,
+            'move_right': UserKey
+        }
 
 
 class GUI(Frame):
@@ -304,8 +327,6 @@ class GUI(Frame):
                     fill=self.cs[' '], tags='%d' % y, width=0
                 )
 
-        game.next_shape = data.get_random_shape(game.shape_size)
-        game.spawn_next_shape()
         self.draw_shape()
 
         self.virtual_kbd = Frame(self.master, bg=self.cs['bg'])

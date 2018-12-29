@@ -17,6 +17,9 @@ def start(event):
     func()
 
 
+tuple_test = (0, 1, 2, 3, 4, 5, 6)
+for i in range(20):
+    print('hi')
 root = tkinter.Tk()
 c = Canvas(root, height=200, width=200, bg='purple')
 c.pack(expand=False, fill='both')
