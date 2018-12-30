@@ -6,7 +6,8 @@ import data
 
 
 def say_hi():
-        root.bell()
+    print('hello')
+    root.bell()
 
 
 def func():
@@ -15,7 +16,8 @@ def func():
 
 
 def start(event):
-    func()
+    print(event.char)
+    # func()
 
 
 print(20.0 in range(0, 21))
@@ -29,7 +31,7 @@ c.pack(expand=False, fill='both')
 cell = c.create_rectangle(0, 0, 100, 100, fill='green')
 c.itemconfigure(cell, fill='blue', width=0)
 c['bg'] = 'orange'
-root.bind('<Enter>', start)
+root.bind('<Key>', start)
 root.mainloop()
 
 list_test = []

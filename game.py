@@ -159,7 +159,9 @@ class Game:
 
         if lines_cleared is not self.shape_size:
             self.combo = 0
-        self.score += data.calculate_score(lines_cleared + self.combo)
+        score = data.calculate_score(lines_cleared + self.combo)
+        # TODO: make score higher if period is shorter
+        self.score += score
         if lines_cleared is self.shape_size:
             self.combo += 1
 
@@ -299,7 +301,7 @@ class GUI(Frame):
     canvas: Canvas              #
     virtual_kbd: Frame          # emulates buttons used for playing
 
-    game_on: bool = False       #
+    un_paused: bool               #
     score: StringVar            #
     period: float               #
     soft_drop: bool = False     #
@@ -316,7 +318,7 @@ class GUI(Frame):
 
         game = Game(self)
         self.game = game
-        self.period = data.get_period()
+        self.period = data.get_period(self.game.lines)
         self.bindings = data.get_default_bindings()
         self.cs = data.COLOR_SCHEMES[game.shape_size]['default']
 
@@ -351,7 +353,7 @@ class GUI(Frame):
                     fill=self.cs[cell.key], tags='%d' % y, width=0
                 )
         self.score = StringVar()
-        self.score.set(self.game.score)
+        self.score.set('left-click to start')
         score_label = Label(self, textvariable=self.score, anchor='nw')
         score_label.pack()
         self.draw_shape()
@@ -419,35 +421,37 @@ class GUI(Frame):
                         fill=self.cs[cell.key]
                     )
             # Update the score label
-            self.score.set('score: %10d' % self.game.score)
+            self.score.set('%d : %d' % (self.game.lines, self.game.score))
 
         # Check to see if the game is over:
         self.spawn_next_shape()
 
-    def gravity(self, counter: int = 0):
+    def gravity(self):
         """
         polling function that makes the
         current shape periodically fall
         """
-        gran = data.PERIOD_GRANULARITY
-        counter += 1
-        sd_counter = floor(gran * data.PERIOD_SOFT_DROP)
-        if counter is gran or (self.soft_drop and counter % sd_counter is 0):
-            counter = 0
-            self.draw_shape(erase=True)
-            if self.game.translate():
-                self.set_curr_shape()
-            else:
-                self.draw_shape()
+        self.draw_shape(erase=True)
+        if self.game.translate():
+            self.set_curr_shape()
+        else:
+            self.draw_shape()
         self.gravity_after_id = self.master.after(
-            floor(self.period / gran),
-            self.gravity(counter)
+            ms=floor(self.period),
+            func=self.gravity
+        )
+
+    def un_pause_gravity(self):
+        self.gravity_after_id = self.master.after(
+            ms=floor(self.period),
+            func=self.gravity
         )
 
     def start(self, event):
-        if not self.game_on:
-            self.game_on = True
-            # self.gravity()  # activate when gravity is working
+        if not hasattr(self, 'un_paused'):
+            self.un_paused = True
+            self.score.set('%d : %d' % (self.game.lines, self.game.score))
+            self.un_pause_gravity()
         else:
             self.master.bell()
 
@@ -464,7 +468,7 @@ class GUI(Frame):
             self.set_curr_shape()
 
     def decode_move(self, event):
-        if not self.game_on:
+        if not self.un_paused or not hasattr(self, 'un_paused'):
             return
 
         key = event.char
@@ -479,14 +483,16 @@ class GUI(Frame):
             self.game.rotate(1)
 
         elif key in b[data.TSD]:
+            self.after_cancel(self.gravity_after_id)
             self.translate()
-        elif key in b[data.TSH]:
-            # self.after_cancel(self.gravity_after_id)  # TODO: fix after_cancel
+            self.un_pause_gravity()
+        elif key in b[data.THD]:
+            self.after_cancel(self.gravity_after_id)
             done = self.game.translate()
             while not done:
                 done = self.game.translate()
             self.set_curr_shape()
-            # self.gravity()  # TODO: fix after_cancel
+            self.un_pause_gravity()
 
         elif key in b[data.TSL]:
             self.translate(3)
@@ -502,19 +508,20 @@ class GUI(Frame):
             while not done:
                 done = self.game.translate(1)
 
-        try:
-            slot = int(key)
-            print(slot)
-            if slot in range(data.STOCKPILE_CAPACITY):
-                self.game.stockpile_access(slot)
-        except ValueError:
-            pass
+        else:
+            try:
+                slot = int(key)
+                print(slot)
+                if slot in range(data.STOCKPILE_CAPACITY):
+                    self.stockpile_access(slot)
+            except ValueError:
+                pass
 
         self.draw_shape()
 
     def game_over(self):
         print(self.gravity_after_id)
-        self.game_on = False
+        self.un_paused = None
         self.after_cancel(self.gravity_after_id)
         # TODO:
         return

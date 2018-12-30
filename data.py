@@ -108,7 +108,7 @@ def get_color_scheme(shape_size: int, key: str):
 RCC = 0
 RCW = 1
 TSD = 2
-TSH = 3
+THD = 3
 TSL = 4
 TSR = 5
 THL = 6
@@ -117,7 +117,7 @@ DEFAULT_BINDINGS = {
     RCC: 'q',
     RCW: 'e',
     TSD: 's',
-    TSH: 'S',
+    THD: 'S ',
     TSL: 'a',
     TSR: 'd',
     THL: 'A',
@@ -142,7 +142,7 @@ PERIOD_SOFT_DROP = 0.5  # 0.0 < this < 1.0
 PERIOD_GRANULARITY = 2
 
 
-def get_period(num_lines: int = 0):
+def get_period(num_lines: int):
     freq = (num_lines + FREQ_OFFSET + 1) / (FREQ_OFFSET + 1)
     freq = FREQ_SCALAR * log(freq, FREQ_BASE) + 1
     return 1000 / freq
