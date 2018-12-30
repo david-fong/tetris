@@ -1,6 +1,6 @@
 from math import floor
 import tkinter
-from tkinter import Frame, Canvas, Button, Menu, Event, colorchooser
+from tkinter import Frame, Canvas, Button, Menu, colorchooser, StringVar, Label
 
 import data
 from shapes import *
@@ -110,24 +110,28 @@ class Game:
         """
         switches the current shape with another
         being stored away. select by index, <slot>
-        """
-        if slot < 0:
-            slot = 0
-        elif slot >= data.STOCKPILE_CAPACITY:
-            slot = data.STOCKPILE_CAPACITY - 1
 
+        requires that slot is in
+        range(data.STOCKPILE_CAPACITY)
+
+        return True if the stockpile at slot
+        was empty, and new shape needs to be spawned.
+        """
         tmp: Shape = self.stockpile[slot]
         if tmp is None:
-            return
+            self.stockpile[slot] = self.curr_shape
+
+            return True
 
         # check if the stock shape has room to be swapped-in:
         for t in tmp.tiles:
             if not self.cell_at_tile(t.p[0]).is_empty():
-                return
+                return False
 
         self.stockpile[slot] = self.curr_shape
         self.curr_shape = tmp
         self.rot = 0
+        return False
 
     def handle_clears(self):
         """
@@ -283,12 +287,14 @@ class GUI(Frame):
     game: Game                  #
     bindings: dict              # map from special constant to a character
     cs: dict                    # a map from color swatches to actual color values
+    cs_id: StringVar
 
     menu: Menu                  #
     canvas: Canvas              #
     virtual_kbd: Frame          # emulates buttons used for playing
 
-    started: bool = False       #
+    game_on: bool = False       #
+    score: StringVar            #
     period: float               #
     soft_drop: bool = False     #
     gravity_after_id = None     # Alarm identifier for after_cancel()
@@ -299,19 +305,29 @@ class GUI(Frame):
         """
         super().__init__(master)
         self.master = master
-        self.focus_set()
+        self.master.focus_set()
         self.pack()
 
         game = Game(self)
         self.game = game
         self.period = data.get_period()
         self.bindings = data.get_default_bindings()
-        self.set_color_scheme()
+        self.cs = data.COLOR_SCHEMES[game.shape_size]['default']
+
+        menu = Menu(master)
+        self.menu = menu
+        self.master.configure(menu=menu)
+        colors_menu = Menu(menu)
+        self.cs_id = StringVar()
+        self.cs_id.trace('w', self.set_color_scheme)
+        menu.add_cascade(label='colors', menu=colors_menu)
+        for scheme in data.COLOR_SCHEMES[self.game.shape_size].keys():
+            colors_menu.add_radiobutton(
+                label=scheme, value=scheme, variable=self.cs_id
+            )
+
+        # Configure the canvas
         canvas = Canvas(self.master, bg=self.cs['bg'])
-
-        self.menu = Menu(master)
-        master['menu'] = self.menu
-
         self.canvas = canvas
         self.canvas.pack(side='left')
         self.canvas['height'] = data.canvas_dmn(game.dmn.y)
@@ -323,17 +339,21 @@ class GUI(Frame):
                 y0 = data.canvas_dmn(game.dmn.y - 1 - y)
                 # create a rectangle canvas item
                 #  and link it to a Cell object
-                game.grid[y][x].canvas_id = self.canvas.create_rectangle(
+                cell = game.grid[y][x]
+                cell.canvas_id = self.canvas.create_rectangle(
                     x0, y0, x0 + data.GUI_CELL_WID, y0 + data.GUI_CELL_WID,
-                    fill=self.cs[' '], tags='%d' % y, width=0
+                    fill=self.cs[cell.key], tags='%d' % y, width=0
                 )
-
+        self.score = StringVar()
+        self.score.set(self.game.score)
+        score_label = Label(self, textvariable=self.score, anchor='nw')
+        score_label.pack()
         self.draw_shape()
 
         self.virtual_kbd = Frame(self.master, bg=self.cs['bg'])
         self.virtual_kbd.pack(side='right')
 
-        self.canvas.bind('<Button-1>', self.start)
+        self.master.bind('<Button-1>', self.start)
         self.master.bind('<Key>', self.decode_move)
 
     def draw_shape(self, erase: bool = False):
@@ -343,21 +363,25 @@ class GUI(Frame):
         """
         game = self.game
         key: str = game.curr_shape.name
+        if erase:
+            key = data.CELL_EMPTY_KEY
         for t in game.curr_shape.tiles:
             cell = game.cell_at_tile(t.p[game.rot])
-            try:
-                if erase:
-                    cell.clear()
-                    self.canvas.itemconfigure(
-                        cell.canvas_id, fill=self.cs[' ']
-                    )
-                else:
-                    self.canvas.itemconfigure(
-                        cell.canvas_id, fill=self.cs[key]
-                    )
-            except AttributeError:
-                continue  # rotated out the top of the grid
+            cell.key = key
+            if hasattr(cell, 'canvas_id'):
+                self.canvas.itemconfigure(
+                    cell.canvas_id, fill=self.cs[key]
+                )  # else rotated out the top of the grid
         return
+
+    def spawn_next_shape(self):
+        if self.game.spawn_next_shape():
+            self.draw_shape()
+            self.game_over()
+        else:
+            self.draw_shape()
+            # TODO: update next shape display:
+            #  self.gui.update_next_shape_canvas
 
     def set_curr_shape(self):
         """
@@ -388,15 +412,11 @@ class GUI(Frame):
                         tagOrId=cell.canvas_id,
                         fill=self.cs[cell.key]
                     )
+            # Update the score label
+            self.score.set('score: %10d' % self.game.score)
 
         # Check to see if the game is over:
-        if self.game.spawn_next_shape():
-            self.draw_shape()
-            self.game_over()
-        else:
-            self.draw_shape()
-            # TODO: update next shape display:
-            #  self.gui.update_next_shape_canvas
+        self.spawn_next_shape()
 
     def gravity(self, counter: int = 0):
         """
@@ -413,22 +433,23 @@ class GUI(Frame):
                 self.set_curr_shape()
             else:
                 self.draw_shape()
-        self.gravity_after_id = self.canvas.after(
-            ms=(self.period / gran),
-            func=self.gravity(counter)
+        self.gravity_after_id = self.master.after(
+            floor(self.period / gran),
+            self.gravity(counter)
         )
 
-    def start(self, event: Event):
-        if not self.started:
-            self.started = True
-            self.gravity()
+    def start(self, event):
+        if not self.game_on:
+            self.game_on = True
+            # self.gravity()  # activate when gravity is working
         else:
             self.master.bell()
 
-    def stockpile_access(self, event: Event, slot: int):
+    def stockpile_access(self, slot: int):
         # TODO: Update canvases for slot
         self.draw_shape(erase=True)
-        self.game.stockpile_access(slot)
+        if self.game.stockpile_access(slot):
+            self.spawn_next_shape()
         self.draw_shape()
         return
 
@@ -437,18 +458,23 @@ class GUI(Frame):
             self.set_curr_shape()
 
     def decode_move(self, event):
-        self.draw_shape(erase=True)
+        if not self.game_on:
+            return
+
         key = event.char
+        if key is '':
+            return  # SHIFT key. ignore.
+        self.draw_shape(erase=True)
         b = self.bindings
 
         if key is b[data.RCC]:
             self.game.rotate(3)
-        elif key is b[data.RCW]:
+        elif key in b[data.RCW]:
             self.game.rotate(1)
 
-        elif key is b[data.TSD]:
+        elif key in b[data.TSD]:
             self.translate()
-        elif key is b[data.TSH]:
+        elif key in b[data.TSH]:
             # self.after_cancel(self.gravity_after_id)  # TODO: fix after_cancel
             done = self.game.translate()
             while not done:
@@ -456,31 +482,47 @@ class GUI(Frame):
             self.set_curr_shape()
             # self.gravity()  # TODO: fix after_cancel
 
-        elif key is b[data.TSL]:
+        elif key in b[data.TSL]:
             self.translate(3)
-        elif key is b[data.TSR]:
+        elif key in b[data.TSR]:
             self.translate(1)
 
-        elif key is b[data.THL]:
+        elif key in b[data.THL]:
             done = self.game.translate(3)
             while not done:
                 done = self.game.translate(3)
-        elif key is b[data.THR]:
+        elif key in b[data.THR]:
             done = self.game.translate(1)
             while not done:
                 done = self.game.translate(1)
+
+        try:
+            slot = int(key)
+            print(slot)
+            if slot in range(data.STOCKPILE_CAPACITY):
+                self.game.stockpile_access(slot)
+        except ValueError:
+            pass
 
         self.draw_shape()
 
     def game_over(self):
         print(self.gravity_after_id)
-        self.canvas.configure(bg='red')
+        self.game_on = False
         self.after_cancel(self.gravity_after_id)
         # TODO:
         return
 
-    def set_color_scheme(self, cs_name: str = 'default'):
-        self.cs = data.get_color_scheme(self.game.shape_size, cs_name)
+    def set_color_scheme(self, *args):
+        schemes = data.COLOR_SCHEMES[self.game.shape_size]
+        self.cs = schemes[self.cs_id.get()]
+        for y in range(self.game.dmn.y):
+            for cell in self.game.grid[y]:
+                self.canvas.itemconfigure(
+                    cell.canvas_id, fill=self.cs[cell.key]
+                )
+        self.canvas.configure(bg=self.cs['bg'])
+        self.draw_shape()
 
 
 def main():

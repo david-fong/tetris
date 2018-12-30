@@ -30,7 +30,7 @@ color scheme with key='default'
 COLOR_SCHEMES = {
     4: {
         'default': {
-            'bg': 'black',
+            'bg': 'gray20',
             'key': 'white',
             CELL_EMPTY_KEY: 'black',
             'I': 'cyan',
@@ -40,6 +40,30 @@ COLOR_SCHEMES = {
             'S': 'green',
             'T': 'purple',
             'Z': 'red'
+        },
+        'black & white': {
+            'bg': 'gray20',
+            'key': 'white',
+            CELL_EMPTY_KEY: 'black',
+            'I': 'white',
+            'J': 'white',
+            'L': 'white',
+            'O': 'white',
+            'S': 'white',
+            'T': 'white',
+            'Z': 'white'
+        },
+        'pastel': {
+            'bg': '#FFFFFF',
+            'key': '#F4F4F4',
+            CELL_EMPTY_KEY: '#F4F4F4',
+            'I': '#76F7E4',
+            'J': '#FFBE63',
+            'L': '#FFAE44',
+            'O': '#F7EE4A',
+            'S': '#B9F466',
+            'T': '#FFB2EA',
+            'Z': '#F76565'
         }
     }
 }
@@ -50,7 +74,6 @@ def get_color_scheme(shape_size: int, key: str):
     returns the dictionary corresponding to key
     and that corresponding to 'default' if key
     does not exist
-    :rtype: dict
     """
     try:
         return COLOR_SCHEMES[shape_size][key]
