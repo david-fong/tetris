@@ -18,7 +18,9 @@ def start(event):
     func()
 
 
+print(20.0 in range(0, 21))
 tuple_test = (0, 1, 2, 3, 4, 5, 6)
+data.get_random_shape(4, [])
 for i in range(20):
     print('hi')
 root = tkinter.Tk()

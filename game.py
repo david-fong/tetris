@@ -59,6 +59,7 @@ class Game:
 
     next_shape: Shape = None    # for player (helpful to them)
     curr_shape: Shape = None    # current shape falling & being controlled by the player
+    prev_shapes: list           # queue of previous shapes' name fields
     stockpile: list             # RI: length should not exceed Data.STOCKPILE_CAPACITY
     pos: Pair                   # position of the current shape's pivot
     rot: int                    # {0:down=south, 1:down=east, 2:down=north, 3:down=west}
@@ -103,7 +104,8 @@ class Game:
             self.stockpile.append(None)
 
         # spawn the first shape
-        self.next_shape = data.get_random_shape(self.shape_size)
+        self.prev_shapes = []
+        self.next_shape = data.get_random_shape(self.shape_size, self.prev_shapes)
         self.spawn_next_shape()
 
     def stockpile_access(self, slot: int = 0):
@@ -184,8 +186,12 @@ class Game:
                 return True
 
         # didn't lose; pass on next shape to current shape
+        if hasattr(self.curr_shape, 'name'):  # for the __init__ call
+            self.prev_shapes.append(self.curr_shape.name)
+        if len(self.prev_shapes) >= data.SHAPE_QUEUE_SIZE:
+            self.prev_shapes = self.prev_shapes[1:-1]
         self.curr_shape = self.next_shape
-        self.next_shape = data.get_random_shape(self.shape_size)
+        self.next_shape = data.get_random_shape(self.shape_size, self.prev_shapes)
         return False
 
     def translate(self, direction: int = 0):

@@ -4,20 +4,44 @@ from math import log
 from shapes import Shape
 
 SHAPES = {
-    4: (
-        Shape(((-1, 0), (0, 0), (1, 0), (2, 0)), 'I'),
-        Shape(((-1, 0), (0, 0), (1, 0), (1, -1)), 'J'),
-        Shape(((-1, 0), (0, 0), (1, 0), (-1, -1)), 'L'),
-        Shape(((0, 0), (1, 0), (0, 1), (1, 1)), 'O'),
-        Shape(((-1, -1), (0, -1), (0, 0), (1, 0)), 'S'),
-        Shape(((-1, 0), (0, 0), (1, 0), (0, -1)), 'T'),
-        Shape(((-1, 0), (0, 0), (0, -1), (1, -1)), 'Z')
-    )
+    4: {
+        'I': Shape(((-1, 0),  (0, 0),  (1, 0),  (2, 0)),   'I'),
+        'J': Shape(((-1, 0),  (0, 0),  (1, 0),  (1, -1)),  'J'),
+        'L': Shape(((-1, 0),  (0, 0),  (1, 0),  (-1, -1)), 'L'),
+        'O': Shape(((0, 0),   (1, 0),  (0, 1),  (1, 1)),   'O'),
+        'S': Shape(((-1, -1), (0, -1), (0, 0),  (1, 0)),   'S'),
+        'T': Shape(((-1, 0),  (0, 0),  (1, 0),  (0, -1)),  'T'),
+        'Z': Shape(((-1, 0),  (0, 0),  (0, -1), (1, -1)),  'Z')
+    }
 }
+SHAPE_QUEUE_SIZE = 20
 
 
-def get_random_shape(shape_size):
-    return random.choice(SHAPES[shape_size])
+def get_random_shape(shape_size: int, queue: list):
+    """
+    takes a list of shapes
+    """
+    weights = {}
+    for key in SHAPES[shape_size].keys():
+        weights[key] = queue.count(key) + 1
+    queue_size = 0
+    for weight in weights.values():
+        queue_size += weight
+
+    for key in weights.keys():
+        weights[key] = queue_size / weights.get(key)
+    #  print(weights)
+    total_weight = 0
+    for weight in weights.values():
+        total_weight += weight
+
+    choice = random.uniform(0, total_weight)
+    for key in SHAPES[shape_size].keys():
+        if choice < weights[key]:
+            return SHAPES[shape_size][key]
+        else:
+            choice -= weights[key]
+    assert False
 
 
 CELL_EMPTY_KEY = ' '
