@@ -4,17 +4,8 @@ from tkinter import Frame, Canvas
 import data
 
 
-def say_hi():
-        root.bell()
-
-
-def func():
-    say_hi()
-    root.after(2000, func)
-
-
 def start(event):
-    func()
+    print(event.char)
 
 
 tuple_test = (0, 1, 2, 3, 4, 5, 6)
@@ -26,7 +17,7 @@ c.pack(expand=False, fill='both')
 cell = c.create_rectangle(0, 0, 100, 100, fill='green')
 c.itemconfigure(cell, fill='blue', width=0)
 c['bg'] = 'orange'
-root.bind('<Enter>', start)
+root.bind('<Key>', start)
 root.mainloop()
 
 list_test = []

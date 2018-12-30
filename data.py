@@ -58,6 +58,30 @@ def get_color_scheme(shape_size: int, key: str):
         return COLOR_SCHEMES[shape_size]['default']
 
 
+RCC = 0
+RCW = 1
+TSD = 2
+TSH = 3
+TSL = 4
+TSR = 5
+THL = 6
+THR = 7
+DEFAULT_BINDINGS = {
+    RCC: 'q',
+    RCW: 'e',
+    TSD: 's',
+    TSH: 'S',
+    TSL: 'a',
+    TSR: 'd',
+    THL: 'A',
+    THR: 'D'
+}
+
+
+def get_default_bindings():
+    return DEFAULT_BINDINGS.copy()
+
+
 def calculate_score(num_lines):
     if num_lines is 0:
         return 0

@@ -88,12 +88,12 @@ class Game:
 
         self.dmn = Pair(num_cols, num_rows)
         grid = []
-        for r in range(num_rows):
+        for r in range(num_rows + floor(self.shape_size / 2) + 1):
             row = []
             for c in range(num_cols):
                 cell = Cell()
                 row.append(cell)
-                if r is not 0:
+                if r is not 0 and r < num_rows:
                     grid[r-1][c].set_upstairs_neighbor(cell)
             grid.append(tuple(row))
         self.grid = tuple(grid)
@@ -150,7 +150,6 @@ class Game:
             for cell in self.grid[y]:
                 cell.catch_falling()
         self.lines += lines_cleared
-        print(str(self))
 
         if lines_cleared is not self.shape_size:
             self.combo = 0
@@ -187,16 +186,15 @@ class Game:
 
     def translate(self, direction: int = 0):
         """
-        Returns True if a downward
-        translation could not be done:
-        ie. the host gui must call
-        self.game.set_curr_shape()
+        Returns True if a translation could
+        not be done: ie. if translating down,
+        the host gui must call self.game.set_curr_shape()
         """
         angle = (self.rot + direction) % 4
         for t in self.curr_shape.faces[angle]:
             t_p: Pair = t.p[self.rot].shift(direction)
             if not self.cell_at_tile(t_p).is_empty():
-                return direction is 0
+                return True  # was 'direction is 0'
 
         # translation is valid; execute it
         self.pos = self.pos.shift(direction)
@@ -218,7 +216,7 @@ class Game:
     def cell_at_tile(self, p: Pair):
         x = self.pos.x + p.x
         y = self.pos.y + p.y
-        if x < 0 or x >= self.dmn.x or y < 0 or y >= self.dmn.y:
+        if x < 0 or x >= self.dmn.x or y < 0:  # took out 'or y >= self.dmn.y'
             return Cell(data.CELL_WALL_KEY)
         else:
             return self.grid[y][x]
@@ -283,12 +281,14 @@ class GUI(Frame):
     """
     master: Frame               # top level frame
     game: Game                  #
+    bindings: dict              # map from special constant to a character
     cs: dict                    # a map from color swatches to actual color values
 
     menu: Menu                  #
     canvas: Canvas              #
     virtual_kbd: Frame          # emulates buttons used for playing
 
+    started: bool = False       #
     period: float               #
     soft_drop: bool = False     #
     gravity_after_id = None     # Alarm identifier for after_cancel()
@@ -305,6 +305,7 @@ class GUI(Frame):
         game = Game(self)
         self.game = game
         self.period = data.get_period()
+        self.bindings = data.get_default_bindings()
         self.set_color_scheme()
         canvas = Canvas(self.master, bg=self.cs['bg'])
 
@@ -333,12 +334,7 @@ class GUI(Frame):
         self.virtual_kbd.pack(side='right')
 
         self.canvas.bind('<Button-1>', self.start)
-        self.master.bind('a', self.translate_left)
-        self.master.bind('d', self.translate_right)
-        self.master.bind('q', self.rotate_counterclockwise)
-        self.master.bind('e', self.rotate_clockwise)
-        self.master.bind('w', self.hard_drop)
-        self.master.bind('s', self.translate_down)
+        self.master.bind('<Key>', self.decode_move)
 
     def draw_shape(self, erase: bool = False):
         """
@@ -349,15 +345,18 @@ class GUI(Frame):
         key: str = game.curr_shape.name
         for t in game.curr_shape.tiles:
             cell = game.cell_at_tile(t.p[game.rot])
-            if erase:
-                cell.clear()
-                self.canvas.itemconfigure(
-                    cell.canvas_id, fill=self.cs[' ']
-                )
-            else:
-                self.canvas.itemconfigure(
-                    cell.canvas_id, fill=self.cs[key]
-                )
+            try:
+                if erase:
+                    cell.clear()
+                    self.canvas.itemconfigure(
+                        cell.canvas_id, fill=self.cs[' ']
+                    )
+                else:
+                    self.canvas.itemconfigure(
+                        cell.canvas_id, fill=self.cs[key]
+                    )
+            except AttributeError:
+                continue  # rotated out the top of the grid
         return
 
     def set_curr_shape(self):
@@ -409,11 +408,8 @@ class GUI(Frame):
         sd_counter = floor(gran * data.PERIOD_SOFT_DROP)
         if counter is gran or (self.soft_drop and counter % sd_counter is 0):
             counter = 0
-            print('drop')
             self.draw_shape(erase=True)
             if self.game.translate():
-                self.draw_shape()
-                print('and set!')
                 self.set_curr_shape()
             else:
                 self.draw_shape()
@@ -423,64 +419,58 @@ class GUI(Frame):
         )
 
     def start(self, event: Event):
-        self.gravity()
-        return
+        if not self.started:
+            self.started = True
+            self.gravity()
+        else:
+            self.master.bell()
 
-    def stockpile_access(self, event: Event):
+    def stockpile_access(self, event: Event, slot: int):
+        # TODO: Update canvases for slot
         self.draw_shape(erase=True)
-
-        slot: int  # TODO
         self.game.stockpile_access(slot)
-
         self.draw_shape()
         return
 
-    def rotate_clockwise(self, event: Event):
+    def translate(self, direction: int = 0):
+        if self.game.translate(direction) and direction is 0:
+            self.set_curr_shape()
+
+    def decode_move(self, event):
         self.draw_shape(erase=True)
-        self.game.rotate(1)
-        self.draw_shape()
-        return
+        key = event.char
+        b = self.bindings
 
-    def rotate_counterclockwise(self, event: Event):
-        self.draw_shape(erase=True)
-        self.game.rotate(3)
-        self.draw_shape()
-        return
+        if key is b[data.RCC]:
+            self.game.rotate(3)
+        elif key is b[data.RCW]:
+            self.game.rotate(1)
 
-    def translate_left(self, event: Event):
-        self.draw_shape(erase=True)
-        self.game.translate(3)
-        self.draw_shape()
-
-    def translate_right(self, event: Event):
-        self.draw_shape(erase=True)
-        self.game.translate(1)
-        self.draw_shape()
-
-    def translate_down(self, event: Event):
-        self.draw_shape(erase=True)
-        if self.game.translate():
-            if self.set_curr_shape():
-                self.game_over()
-        self.draw_shape()
-
-    def set_soft_drop(self, event: Event):
-        # TODO if press, set True, if release, set False
-        return
-
-    def hard_drop(self, event: Event):
-        # self.after_cancel(self.gravity_after_id)  # TODO: fix after_cancel
-        self.draw_shape(erase=True)
-
-        # translate down until hit bottom or another shape
-        done = self.game.translate()
-        while not done:
+        elif key is b[data.TSD]:
+            self.translate()
+        elif key is b[data.TSH]:
+            # self.after_cancel(self.gravity_after_id)  # TODO: fix after_cancel
             done = self.game.translate()
+            while not done:
+                done = self.game.translate()
+            self.set_curr_shape()
+            # self.gravity()  # TODO: fix after_cancel
+
+        elif key is b[data.TSL]:
+            self.translate(3)
+        elif key is b[data.TSR]:
+            self.translate(1)
+
+        elif key is b[data.THL]:
+            done = self.game.translate(3)
+            while not done:
+                done = self.game.translate(3)
+        elif key is b[data.THR]:
+            done = self.game.translate(1)
+            while not done:
+                done = self.game.translate(1)
 
         self.draw_shape()
-        self.set_curr_shape()
-        # self.gravity()                            # TODO: fix after_cancel
-        return
 
     def game_over(self):
         print(self.gravity_after_id)
