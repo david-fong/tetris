@@ -26,11 +26,12 @@ def start(event):
 tuple_test = (0, 1, 2, 3, 4, 5, 6)
 data.get_random_shape(4, [])
 root = tkinter.Tk()
-c = Canvas(root, height=200, width=200, bg='purple')
-c.pack(expand=False, fill='both')
-cell = c.create_rectangle(0, 0, 100, 100, fill='green')
-c.itemconfigure(cell, fill='blue', width=0)
-c['bg'] = 'orange'
+canvas = Canvas(root, height=200, width=200, bg='purple')
+canvas.pack(expand=False, fill='both')
+cell = canvas.create_rectangle(0, 0, 100, 100, fill='green')
+canvas.itemconfigure(cell, fill='blue', width=0)
+canvas['bg'] = 'orange'
+canvas.itemconfigure('all', fill='black')
 root.bind('<Key>', start)
 label = tkinter.Label(root)
 label.configure(text='SIERGEY! MY FRIEND!')

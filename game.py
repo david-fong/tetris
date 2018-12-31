@@ -231,17 +231,18 @@ class ShapeFrame(Frame):
     canvas: Canvas
     canvas_ids: tuple   # 2D tuple of canvas item ids
 
-    def __init__(self, master: Frame, shape_size: int, name: str):
+    def __init__(self, master: Frame, shape_size: int, cs: dict, name: str):
         super(ShapeFrame, self).__init__(master)
         self.master = master
 
         self.shape_size = shape_size
-        self.pos = Pair(floor(shape_size / 2), floor(shape_size / 2))
+        self.pos = Pair(floor(shape_size / 2) - 1, floor(shape_size / 2))
 
         canvas = Canvas(self)
         canvas.configure(
             height=(data.canvas_dmn(shape_size) - data.GUI_CELL_PAD),
-            width=(data.canvas_dmn(shape_size) - data.GUI_CELL_PAD)
+            width=(data.canvas_dmn(shape_size) - data.GUI_CELL_PAD),
+            bg=cs['bg']
         )
         canvas_ids = []
         for y in range(shape_size):
@@ -251,7 +252,7 @@ class ShapeFrame(Frame):
                 y0 = data.canvas_dmn(shape_size - 1 - y)
                 canvas_id = canvas.create_rectangle(
                     x0, y0, x0 + data.GUI_CELL_WID, y0 + data.GUI_CELL_WID,
-                    width=0
+                    width=0, fill=cs[data.CELL_EMPTY_KEY]
                 )
                 row.append(canvas_id)
             canvas_ids.append(tuple(row))
@@ -264,12 +265,14 @@ class ShapeFrame(Frame):
         label.pack()
 
     def redraw_shape(self, cs: dict, shape: Shape):
-        key = cs[shape.name]
         # clear all drawn tiles
-        self.canvas.itemconfigure('ALL', fill=cs[data.CELL_EMPTY_KEY])
-        for t in shape.tiles:
-            canvas_id = self.id_at_tile(t.p[0])
-            self.canvas.configure(canvas_id, fill=cs[key])
+        self.canvas.itemconfigure('all', fill=cs[data.CELL_EMPTY_KEY])
+
+        if shape is not None:
+            key = cs[shape.name]
+            for t in shape.tiles:
+                canvas_id = self.id_at_tile(t.p[0])
+                self.canvas.itemconfigure(canvas_id, fill=key)
 
     def id_at_tile(self, p: Pair):
         x = self.pos.x + p.x
@@ -315,7 +318,9 @@ class GameFrame(Frame):
         self.cs_string_var.trace('w', self.set_color_scheme)
 
         # Configure the canvas
-        canvas = Canvas(self, bg=self.cs['bg'])
+        game_frame = Frame(self)
+        game_frame.pack(side='left')
+        canvas = Canvas(game_frame, bg=self.cs['bg'])
         canvas.configure(
             height=(data.canvas_dmn(game.dmn.y) - data.GUI_CELL_PAD),
             width=(data.canvas_dmn(game.dmn.x) - data.GUI_CELL_PAD),
@@ -340,20 +345,24 @@ class GameFrame(Frame):
         stockpile_frame = Frame(self)
         stockpile = []
         for slot in range(len(self.game.stockpile)):
-            shape_frame = ShapeFrame(stockpile_frame, self.game.shape_size, str(slot))
-            stockpile.append(shape_frame)  # TODO: make this dict from key_binding to ShapeFrame
+            shape_frame = ShapeFrame(
+                stockpile_frame,
+                self.game.shape_size,
+                self.cs, str(slot)
+            )
+            stockpile.append(shape_frame)  # TODO: make this a dict from key_binding to ShapeFrame
             shape_frame.grid(row=slot, column=0)
         self.stockpile = stockpile
-        stockpile_frame.pack()
+        stockpile_frame.pack(side='right')
 
         # Configure the score label
         self.score = StringVar()
         self.score.set('left-click to start')
-        score_label = Label(self, textvariable=self.score)
+        score_label = Label(game_frame, textvariable=self.score)
         score_label.pack(side='top')
 
         self.master.bind('<Button-1>', self.start, '+')
-        self.master.bind('<Key>', self.decode_move, '+')  # TODO: take out .master?
+        self.master.bind('<Key>', self.decode_move, '+')
 
     def draw_shape(self, erase: bool = False):
         """
@@ -422,11 +431,14 @@ class GameFrame(Frame):
             self.set_curr_shape()
 
     def stockpile_access(self, slot: int):
-        # TODO: Update canvases for slot
         self.draw_shape(erase=True)
         if self.game.stockpile_access(slot):
             self.spawn_next_shape()
         self.draw_shape()
+
+        self.stockpile[slot].redraw_shape(
+            self.cs, self.game.stockpile[slot]
+        )
         return
 
     def gravity(self):
@@ -461,6 +473,10 @@ class GameFrame(Frame):
             self.un_pause_gravity()
         else:
             self.master.bell()
+
+    def restart(self):
+        # TODO
+        return
 
     def decode_move(self, event):
         if not hasattr(self, 'un_paused') or self.un_paused is None:
@@ -514,11 +530,12 @@ class GameFrame(Frame):
         elif key in b[data.PAUSE] and self.un_paused:
             self.un_paused = False
             self.after_cancel(self.gravity_after_id)
+        elif key in b[data.RESTART]:
+            self.restart()
 
         else:
             try:
-                slot = int(key)
-                print(slot)
+                slot = int(key) - 1
                 if slot in range(data.STOCKPILE_CAPACITY):
                     self.stockpile_access(slot)
             except ValueError:
@@ -527,7 +544,6 @@ class GameFrame(Frame):
         self.draw_shape()
 
     def game_over(self):
-        print(self.gravity_after_id)
         self.un_paused = None
         self.after_cancel(self.gravity_after_id)
         return
@@ -542,6 +558,11 @@ class GameFrame(Frame):
                 )
         self.canvas.configure(bg=self.cs['bg'])
         self.draw_shape()
+
+        for slot in range(len(self.stockpile)):
+            shape_frame: ShapeFrame = self.stockpile[slot]
+            shape_frame.canvas.configure(bg=self.cs['bg'])
+            shape_frame.redraw_shape(self.cs, self.game.stockpile[slot])
 
 
 class TetrisApp(Tk):
