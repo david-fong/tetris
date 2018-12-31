@@ -97,6 +97,7 @@ PAUSE = 'pause game'
 """
 all players should have the same pause keys
 """
+DEFAULT_NUM_PLAYERS = 1
 DEFAULT_BINDINGS = {
     1: {
         0: {
@@ -124,13 +125,13 @@ DEFAULT_BINDINGS = {
             PAUSE: ('Caps_Lock', 'Space')
         },
         1: {
-            RCC: ('o', ),
-            RCW: ('[', ),
-            TSD: (';', ),
-            THD: ('p', ),
-            TSL: ('l', ),
+            RCC: ('u', ),
+            RCW: ('o', ),
+            TSD: ('k', ),
+            THD: ('i', ),
+            TSL: ('j', ),
             THL: tuple(),
-            TSR: ('\'', ),
+            TSR: ('l', ),
             THR: tuple(),
             PAUSE: ('Caps_Lock', 'Space')
         }

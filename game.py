@@ -302,7 +302,6 @@ class GameFrame(Frame):
         assert isinstance(master, TetrisApp)
         super(GameFrame, self).__init__(master)
         self.master = master
-        self.pack()
 
         game = Game(master.shape_size, num_rows, num_cols)
         self.period = data.get_period(game.lines)
@@ -314,7 +313,7 @@ class GameFrame(Frame):
         self.cs_string_var.trace('w', self.set_color_scheme)
 
         # Configure the canvas
-        canvas = Canvas(self.master, bg=self.cs['bg'])
+        canvas = Canvas(self, bg=self.cs['bg'])
         canvas.configure(
             height=(data.canvas_dmn(game.dmn.y) - data.GUI_CELL_PAD),
             width=(data.canvas_dmn(game.dmn.x) - data.GUI_CELL_PAD),
@@ -331,17 +330,17 @@ class GameFrame(Frame):
                     x0, y0, x0 + data.GUI_CELL_WID, y0 + data.GUI_CELL_WID,
                     fill=self.cs[cell.key], tags='%d' % y, width=0
                 )
-        canvas.pack()
+        canvas.pack(side='top')
         self.canvas = canvas
         self.draw_shape()
 
         self.score = StringVar()
         self.score.set('left-click to start')
         score_label = Label(self, textvariable=self.score)
-        score_label.pack()
+        score_label.pack(side='top')
 
-        self.master.bind('<Button-1>', self.start)
-        self.master.bind('<Key>', self.decode_move)  # TODO: take out .master?
+        self.master.bind('<Button-1>', self.start, '+')
+        self.master.bind('<Key>', self.decode_move, '+')  # TODO: take out .master?
 
     def draw_shape(self, erase: bool = False):
         """
@@ -545,10 +544,11 @@ class TetrisApp(Tk):
                  num_rows: int = None,
                  num_cols: int = None,
                  num_players: int = 1):
-        super().__init__()
+        super(TetrisApp, self).__init__()
 
         if shape_size not in data.SHAPES.keys():
             shape_size = data.DEFAULT_SHAPE_SIZE
+        self.shape_size = shape_size
 
         if num_rows is None:
             num_rows = data.DEFAULT_NUM_ROWS[shape_size]
@@ -559,7 +559,8 @@ class TetrisApp(Tk):
         elif num_cols < shape_size * 2:
             num_cols = shape_size * 2
 
-        self.shape_size = shape_size
+        if num_players not in data.DEFAULT_BINDINGS.keys():
+            num_players = data.DEFAULT_NUM_PLAYERS
 
         menu = Menu(self)
         colors_menu = Menu(menu)
@@ -575,15 +576,17 @@ class TetrisApp(Tk):
         assert num_players > 0
         players = []
         for player_num in range(num_players):
-            players.append(GameFrame(
+            player = GameFrame(
                 self, num_rows, num_cols,
                 data.get_default_bindings(num_players, player_num)
-            ))
-            self.players = tuple(players)
+            )
+            player.grid(row=0, column=player_num)
+            players.append(player)
+        self.players = tuple(players)
 
 
 def main():
-    app = TetrisApp()
+    app = TetrisApp(num_players=2)
     app.mainloop()
 
 

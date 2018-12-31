@@ -23,11 +23,8 @@ def start(event):
     # func()
 
 
-print(20.0 in range(0, 21))
 tuple_test = (0, 1, 2, 3, 4, 5, 6)
 data.get_random_shape(4, [])
-for i in range(20):
-    print('hi')
 root = tkinter.Tk()
 c = Canvas(root, height=200, width=200, bg='purple')
 c.pack(expand=False, fill='both')
@@ -35,6 +32,9 @@ cell = c.create_rectangle(0, 0, 100, 100, fill='green')
 c.itemconfigure(cell, fill='blue', width=0)
 c['bg'] = 'orange'
 root.bind('<Key>', start)
+label = tkinter.Label(root)
+label.configure(text='SIERGEY! MY FRIEND!')
+label.pack()
 root.mainloop()
 
 list_test = []
