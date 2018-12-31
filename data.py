@@ -3,6 +3,7 @@ from math import log
 
 from shapes import Shape
 
+DEFAULT_SHAPE_SIZE = 4
 SHAPES = {
     4: {
         'I': Shape(((-1, 0),  (0, 0),  (1, 0),  (2, 0)),   'I'),
@@ -84,30 +85,62 @@ COLOR_SCHEMES = {
 }
 
 
-RCC = 0
-RCW = 1
-TSD = 2
-THD = 3
-TSL = 4
-TSR = 5
-THL = 6
-THR = 7
-PAUSE = 8
+RCC = 'rotate counter-clockwise'
+RCW = 'rotate clockwise'
+TSD = 'soft drop'
+THD = 'hard drop'
+TSL = 'move left'
+THL = 'hard left'
+TSR = 'move right'
+THR = 'hard right'
+PAUSE = 'pause game'
+"""
+all players should have the same pause keys
+"""
 DEFAULT_BINDINGS = {
-    RCC: ('q', ),
-    RCW: ('e', ),
-    TSD: ('s', ),
-    THD: ('S', 'space'),
-    TSL: ('a', 'Left'),
-    TSR: ('d', 'Right'),
-    THL: ('A', ),
-    THR: ('D', ),
-    PAUSE: ('Caps_Lock', )
+    1: {
+        0: {
+            RCC: ('q', ),
+            RCW: ('e', ),
+            TSD: ('s', ),
+            THD: ('S', 'w', 'space'),
+            TSL: ('a', 'Left'),
+            THL: ('A', ),
+            TSR: ('d', 'Right'),
+            THR: ('D', ),
+            PAUSE: ('Caps_Lock', )
+        }
+    },
+    2: {
+        0: {
+            RCC: ('q', ),
+            RCW: ('e', ),
+            TSD: ('s', ),
+            THD: ('w', ),
+            TSL: ('a', ),
+            THL: tuple(),
+            TSR: ('d', ),
+            THR: tuple(),
+            PAUSE: ('Caps_Lock', 'Space')
+        },
+        1: {
+            RCC: ('o', ),
+            RCW: ('[', ),
+            TSD: (';', ),
+            THD: ('p', ),
+            TSL: ('l', ),
+            THL: tuple(),
+            TSR: ('\'', ),
+            THR: tuple(),
+            PAUSE: ('Caps_Lock', 'Space')
+        }
+    }
 }
 
 
-def get_default_bindings():
-    return DEFAULT_BINDINGS.copy()
+def get_default_bindings(num_players: int, player_num: int):
+    assert player_num < num_players
+    return DEFAULT_BINDINGS[num_players][player_num].copy()
 
 
 def calculate_score(num_lines):

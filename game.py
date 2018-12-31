@@ -1,7 +1,8 @@
 from math import floor
 import tkinter
-from tkinter import Menu, colorchooser, StringVar
+from tkinter import Tk, Frame, Canvas, Label, Menu, StringVar
 
+import data
 from shapes import *
 
 
@@ -63,29 +64,12 @@ class Game:
     pos: Pair                   # position of the current shape's pivot
     rot: int                    # {0:down=south, 1:down=east, 2:down=north, 3:down=west}
 
-    gui = None
-
-    def __init__(self, gui,
-                 shape_size: int = 4,
-                 num_rows: int = None,
-                 num_cols: int = None
+    def __init__(self,
+                 shape_size: int,
+                 num_rows: int,
+                 num_cols: int
                  ):
-        assert isinstance(gui, GameFrame)
-        self.gui = gui
         self.shape_size = shape_size
-
-        # use defaults or floor choices
-        # to make sure user doesn't give
-        # themselves a bad time
-        if num_rows is None:
-            num_rows = data.DEFAULT_NUM_ROWS[shape_size]
-        elif num_rows < shape_size * 4:
-            num_rows = shape_size * 4
-        if num_cols is None:
-            num_cols = data.DEFAULT_NUM_COLS[shape_size]
-        elif num_cols < shape_size * 2:
-            num_cols = shape_size * 2
-
         self.dmn = Pair(num_cols, num_rows)
         grid = []
         for r in range(num_rows + floor(self.shape_size / 2) + 1):
@@ -98,12 +82,11 @@ class Game:
             grid.append(tuple(row))
         self.grid = tuple(grid)
 
+        # spawn the first shape
+        self.prev_shapes = []
         self.stockpile = []
         for i in range(self.shape_size):
             self.stockpile.append(None)
-
-        # spawn the first shape
-        self.prev_shapes = []
         self.next_shape = data.get_random_shape(self.shape_size, self.prev_shapes)
         self.spawn_next_shape()
 
@@ -241,6 +224,58 @@ class Game:
         return to_string
 
 
+class ShapeFrame(Frame):
+    master: Frame
+    shape_size: int
+    pos: Pair
+    canvas: Canvas
+    canvas_ids: tuple   # 2D tuple of canvas item ids
+
+    def __init__(self, master: Frame, shape_size: int, name: str):
+        super(ShapeFrame, self).__init__(master)
+        self.master = master
+        self.pack()
+
+        self.shape_size = shape_size
+        self.pos = Pair(floor(shape_size / 2), floor(shape_size / 2))
+
+        canvas = Canvas(self)
+        canvas.configure(
+            height=(data.canvas_dmn(shape_size) - data.GUI_CELL_PAD),
+            width=(data.canvas_dmn(shape_size) - data.GUI_CELL_PAD)
+        )
+        canvas_ids = []
+        for y in range(shape_size):
+            row = []
+            for x in range(shape_size):
+                x0 = data.canvas_dmn(x)
+                y0 = data.canvas_dmn(shape_size - 1 - y)
+                canvas_id = canvas.create_rectangle(
+                    x0, y0, x0 + data.GUI_CELL_WID, y0 + data.GUI_CELL_WID,
+                    width=0
+                )
+                row.append(canvas_id)
+            canvas_ids.append(tuple(row))
+        self.canvas_ids = tuple(canvas_ids)
+
+        label = Label(self)
+        label.configure(text=str(name))
+        label.pack()
+
+    def redraw_shape(self, cs: dict, shape: Shape):
+        key = cs[shape.name]
+        # clear all drawn tiles
+        self.canvas.itemconfigure('ALL', fill=cs[data.CELL_EMPTY_KEY])
+        for t in shape.tiles:
+            canvas_id = self.id_at_tile(t.p[0])
+            self.canvas.configure(canvas_id, fill=cs[key])
+
+    def id_at_tile(self, p: Pair):
+        x = self.pos.x + p.x
+        y = self.pos.y + p.y
+        return self.canvas_ids[y][x]
+
+
 class GameFrame(Frame):
     """
 
@@ -258,21 +293,24 @@ class GameFrame(Frame):
     period: float               #
     gravity_after_id = None     # Alarm identifier for after_cancel()
 
-    def __init__(self, master, cs_string_var):
+    def __init__(self, master: Tk,
+                 num_rows: int, num_cols: int,
+                 bindings: dict):
         """
 
         """
-        super().__init__(master)
+        assert isinstance(master, TetrisApp)
+        super(GameFrame, self).__init__(master)
         self.master = master
         self.pack()
 
-        game = Game(self)
+        game = Game(master.shape_size, num_rows, num_cols)
         self.period = data.get_period(game.lines)
-        self.bindings = data.get_default_bindings()
+        self.bindings = bindings
         self.cs = data.COLOR_SCHEMES[game.shape_size]['default']
         self.game = game
 
-        self.cs_string_var = cs_string_var
+        self.cs_string_var = master.cs_string_var
         self.cs_string_var.trace('w', self.set_color_scheme)
 
         # Configure the canvas
@@ -295,15 +333,15 @@ class GameFrame(Frame):
                 )
         canvas.pack()
         self.canvas = canvas
+        self.draw_shape()
 
         self.score = StringVar()
         self.score.set('left-click to start')
         score_label = Label(self, textvariable=self.score)
         score_label.pack()
-        self.draw_shape()
 
         self.master.bind('<Button-1>', self.start)
-        self.master.bind('<Key>', self.decode_move)
+        self.master.bind('<Key>', self.decode_move)  # TODO: take out .master?
 
     def draw_shape(self, erase: bool = False):
         """
@@ -494,22 +532,59 @@ class GameFrame(Frame):
         self.draw_shape()
 
 
-class TetrisApp(tkinter.Tk):
+class TetrisApp(Tk):
     """
 
     """
-    root = tkinter.Tk()
-    menu = Menu(root)
-    colors_menu = Menu(menu)
-    menu.add_cascade(label='colors', menu=colors_menu)
-    cs_string_var = StringVar()
-    root.configure(menu=menu)
-    gui = GameFrame(root, cs_string_var)
-    for scheme in data.COLOR_SCHEMES[gui.game.shape_size].keys():
-        colors_menu.add_radiobutton(
-            label=scheme, value=scheme, variable=cs_string_var
-        )
-    gui.mainloop()
+    shape_size: int
+    cs_string_var: StringVar
+    players: tuple
+
+    def __init__(self,
+                 shape_size: int = data.DEFAULT_SHAPE_SIZE,
+                 num_rows: int = None,
+                 num_cols: int = None,
+                 num_players: int = 1):
+        super().__init__()
+
+        if shape_size not in data.SHAPES.keys():
+            shape_size = data.DEFAULT_SHAPE_SIZE
+
+        if num_rows is None:
+            num_rows = data.DEFAULT_NUM_ROWS[shape_size]
+        elif num_rows < shape_size * 4:
+            num_rows = shape_size * 4
+        if num_cols is None:
+            num_cols = data.DEFAULT_NUM_COLS[shape_size]
+        elif num_cols < shape_size * 2:
+            num_cols = shape_size * 2
+
+        self.shape_size = shape_size
+
+        menu = Menu(self)
+        colors_menu = Menu(menu)
+        menu.add_cascade(label='colors', menu=colors_menu)
+        self.configure(menu=menu)
+
+        self.cs_string_var = StringVar()
+        for scheme in data.COLOR_SCHEMES[self.shape_size].keys():
+            colors_menu.add_radiobutton(
+                label=scheme, value=scheme, variable=self.cs_string_var
+            )
+
+        assert num_players > 0
+        players = []
+        for player_num in range(num_players):
+            players.append(GameFrame(
+                self, num_rows, num_cols,
+                data.get_default_bindings(num_players, player_num)
+            ))
+            self.players = tuple(players)
+
+
+def main():
+    app = TetrisApp()
+    app.mainloop()
 
 
 main()
