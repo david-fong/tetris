@@ -1,4 +1,3 @@
-from math import floor
 from tkinter import Tk, Frame, Canvas, Label, Menu, StringVar, IntVar, messagebox
 
 import data
@@ -49,29 +48,31 @@ class Game:
     """
     shape_size: int             # > 0. determines many of the following qualities
     dmn: Pair                   # stores the number of rows in y and cols in x
-    grid: tuple                 # tuple of lists of shape keys (Cells)
+    grid: ([Cell, ], )          # tuple of lists of shape keys (Cells)
     ceil_len: int = 0           # RI: must be < len(self.grid)
 
     lines: int = 0              # number of lines cleared in total
     score: int = 0              # for player (indicates skill?)
     combo: int = 0              # streak of clearing <shape_size> lines with one shape
 
+    shape_set: str              # a key for this shape_size to a set of shapes
     next_shape: Shape = None    # for player (helpful to them)
     curr_shape: Shape = None    # current shape falling & being controlled by the player
-    prev_shapes: list           # queue of previous shapes' name fields
-    stockpile: list             # RI: length should not exceed Data.STOCKPILE_CAPACITY
+    prev_shapes: [str, ]        # queue of previous shapes' name fields
+    stockpile: [str, ]          # shape keys. RI: length should not exceed Data.STOCKPILE_CAPACITY
     pos: Pair                   # position of the current shape's pivot
     rot: int                    # {0:down=south, 1:down=east, 2:down=north, 3:down=west}
 
     def __init__(self,
                  shape_size: int,
                  num_rows: int,
-                 num_cols: int
+                 num_cols: int,
+                 shape_set: str
                  ):
         self.shape_size = shape_size
         self.dmn = Pair(num_cols, num_rows)
         grid = []
-        for r in range(num_rows + floor(self.shape_size / 2) + 1):
+        for r in range(num_rows + int(self.shape_size / 2) + 1):
             row = []
             for c in range(num_cols):
                 cell = Cell()
@@ -82,14 +83,11 @@ class Game:
         self.grid = tuple(grid)
 
         # spawn the first shape
-        self.prev_shapes = []
-        self.stockpile = []
-        for i in range(self.shape_size):
-            self.stockpile.append(None)
-        self.next_shape = data.get_random_shape(self.shape_size, self.prev_shapes)
-        self.spawn_next_shape()
+        self.curr_shape = None
+        self.shape_set = None
+        self.change_shape_set(shape_set)
 
-    def stockpile_access(self, slot: int = 0):
+    def stockpile_access(self, slot: int):
         """
         switches the current shape with another
         being stored away. select by index, <slot>
@@ -100,19 +98,20 @@ class Game:
         return True if the stockpile at slot
         was empty, and new shape needs to be spawned.
         """
-        tmp: Shape = self.stockpile[slot]
-        if tmp is None:
-            self.stockpile[slot] = self.curr_shape
-
+        slot_copy: str = self.stockpile[slot]
+        if slot_copy is data.SHAPE_EMPTY_NAME:
+            self.stockpile[slot] = self.curr_shape.name
             return True
 
-        # check if the stock shape has room to be swapped-in:
-        for t in tmp.tiles:
+        slot_shape = data.SHAPES[self.shape_size][self.shape_set][slot_copy]
+
+        # check if the stock shape has no room to be swapped-in:
+        for t in slot_shape.tiles:
             if not self.cell_at_tile(t.p[0]).is_empty():
                 return False
 
-        self.stockpile[slot] = self.curr_shape
-        self.curr_shape = tmp
+        self.stockpile[slot] = self.curr_shape.name
+        self.curr_shape = slot_shape
         self.rot = 0
         return False
 
@@ -152,6 +151,7 @@ class Game:
         """
         called once during initialization, and
         always at the end of set_curr_shape().
+        Also called when changing shape_set
 
         Returns True if there is no room for
         the next shape to spawn and the host
@@ -161,7 +161,7 @@ class Game:
         # get the pivot position for the next tile to spawn in
         shape_ceil = self.next_shape.extreme(self.rot, 2)
         spawn_y = self.dmn.y - (1 + self.ceil_len + shape_ceil)
-        self.pos = Pair(floor(self.dmn.x / 2) - 1, spawn_y)
+        self.pos = Pair(int(self.dmn.x / 2), spawn_y)
 
         # check if the next tile has room to spawn
         for t in self.next_shape.tiles:
@@ -169,12 +169,14 @@ class Game:
                 return True
 
         # didn't lose; pass on next shape to current shape
-        if hasattr(self.curr_shape, 'name'):  # for the __init__ call
+        if self.curr_shape is not None:  # for the __init__ call
             self.prev_shapes.append(self.curr_shape.name)
         if len(self.prev_shapes) >= data.SHAPE_QUEUE_SIZE:
             self.prev_shapes = self.prev_shapes[1:-1]
         self.curr_shape = self.next_shape
-        self.next_shape = data.get_random_shape(self.shape_size, self.prev_shapes)
+        self.next_shape = data.get_random_shape(
+            self.shape_size, self.shape_set, self.prev_shapes
+        )
         return False
 
     def translate(self, direction: int = 0):
@@ -206,6 +208,28 @@ class Game:
         self.rot = rot
         return True
 
+    def change_shape_set(self, shape_set: str):
+        not_compatible: bool = False
+        if self.shape_set is not None:
+            for key in data.SHAPES[self.shape_size][self.shape_set].keys():
+                if key not in data.SHAPES[self.shape_set][shape_set].keys():
+                    not_compatible = True
+                    break
+        else:
+            not_compatible = True
+
+        self.shape_set = shape_set
+        if not_compatible:
+            self.prev_shapes = []
+            self.stockpile = []
+            for i in range(self.shape_size):
+                self.stockpile.append(data.SHAPE_EMPTY_NAME)
+            self.next_shape = data.get_random_shape(
+                self.shape_size, self.shape_set, self.prev_shapes
+            )
+
+        self.spawn_next_shape()
+
     def cell_at_tile(self, p: Pair):
         x = self.pos.x + p.x
         y = self.pos.y + p.y
@@ -235,7 +259,7 @@ class ShapeFrame(Frame):
         self.master = master
 
         self.shape_size = shape_size
-        self.pos = Pair(floor(shape_size / 2) - 1, floor(shape_size / 2))
+        self.pos = Pair(int(shape_size / 2), int(shape_size / 2))
 
         label = Label(self)
         label.configure(text=str(name))
@@ -263,15 +287,15 @@ class ShapeFrame(Frame):
         self.canvas = canvas
         canvas.pack()
 
-    def redraw_shape(self, cs: dict, shape: Shape):
+    def redraw_shape(self, cs: dict, shape_set: str, name: str):
         # clear all drawn tiles
         self.canvas.itemconfigure('all', fill=cs[data.CELL_EMPTY_KEY])
 
-        if shape is not None:
-            key = cs[shape.name]
-            for t in shape.tiles:
+        if name is not data.SHAPE_EMPTY_NAME:
+            color = cs[name]
+            for t in data.SHAPES[self.shape_size][shape_set][name].tiles:
                 canvas_id = self.id_at_tile(t.p[0])
-                self.canvas.itemconfigure(canvas_id, fill=key)
+                self.canvas.itemconfigure(canvas_id, fill=color)
 
     def id_at_tile(self, p: Pair):
         x = self.pos.x + p.x
@@ -285,14 +309,16 @@ class GameFrame(Frame):
     """
     master: Frame               # top level frame
     game: Game                  #
-    bindings: dict              # map from special constant to a character
-    cs: dict                    # a map from color swatches to actual color values
+    bindings: {int: str, }      # map from special constant to a list of keysym strings
+    cs: {str: str, }            # a map from color swatches to actual color values
+
     speed_index_int_var: IntVar
+    shape_set: StringVar        #
     cs_string_var: StringVar    #
 
     next_shape: ShapeFrame      #
     canvas: Canvas              #
-    stockpile: list             #
+    stockpile: [ShapeFrame, ]   #
 
     un_paused: bool             #
     score: StringVar            #
@@ -337,7 +363,12 @@ class GameFrame(Frame):
         super(GameFrame, self).__init__(master)
         self.master = master
 
-        game = Game(master.shape_size, num_rows, num_cols)
+        game = Game(
+            master.shape_size,
+            num_rows,
+            num_cols,
+            master.shapes_string_var.get()
+        )
         self.game = game
         self.bindings = bindings
         self.cs = data.COLOR_SCHEMES[game.shape_size]['default']
@@ -345,12 +376,21 @@ class GameFrame(Frame):
         self.speed_index_int_var = master.speed_index_int_var
         self.speed_index_int_var.trace('w', self.set_period)
         self.set_period()
+        # Associate the parent's shape set variable to update
+        self.shape_set = master.shapes_string_var
+        self.shape_set.trace('w', self.change_shape_set)
         # Associate the parent's color scheme variable to update
         self.cs_string_var = master.cs_string_var
         self.cs_string_var.trace('w', self.set_color_scheme)
 
         game_frame = Frame(self)
         game_frame.pack(side='left')
+
+        # Configure the score label
+        self.score = StringVar()
+        self.score.set('left-click to start')
+        score_label = Label(game_frame, textvariable=self.score)
+        score_label.pack(side='top')
 
         # Configure the next shape display
         self.next_shape = ShapeFrame(
@@ -359,13 +399,11 @@ class GameFrame(Frame):
             self.cs, 'next shape:'
         )
         self.next_shape.pack(side='top')
-        self.next_shape.redraw_shape(self.cs, self.game.next_shape)
-
-        # Configure the score label
-        self.score = StringVar()
-        self.score.set('left-click to start')
-        score_label = Label(game_frame, textvariable=self.score)
-        score_label.pack(side='top')
+        self.next_shape.redraw_shape(
+            self.cs,
+            self.shape_set.get(),
+            self.game.next_shape.name
+        )
 
         # Configure the canvas
         self.configure_canvas(game_frame)
@@ -412,7 +450,11 @@ class GameFrame(Frame):
             self.game_over()
         else:
             self.draw_shape()
-            self.next_shape.redraw_shape(self.cs, self.game.next_shape)
+            self.next_shape.redraw_shape(
+                self.cs,
+                self.shape_set.get(),
+                self.game.next_shape.name
+            )
 
     def set_curr_shape(self):
         """
@@ -460,9 +502,10 @@ class GameFrame(Frame):
         self.draw_shape()
 
         self.stockpile[slot].redraw_shape(
-            self.cs, self.game.stockpile[slot]
+            self.cs,
+            self.shape_set.get(),
+            self.game.stockpile[slot]
         )
-        return
 
     def gravity(self):
         """
@@ -479,13 +522,13 @@ class GameFrame(Frame):
         else:
             self.draw_shape()
         self.gravity_after_id = self.master.after(
-            ms=floor(self.period),
+            ms=int(self.period),
             func=self.gravity
         )
 
     def un_pause_gravity(self):
         self.gravity_after_id = self.master.after(
-            ms=floor(self.period),
+            ms=int(self.period),
             func=self.gravity
         )
 
@@ -509,7 +552,7 @@ class GameFrame(Frame):
         key = event.keysym
         b = self.bindings
 
-        # Un-pause game
+        # Game paused
         if not self.un_paused:
             if key in b[data.PAUSE]:
                 self.un_paused = True
@@ -555,7 +598,7 @@ class GameFrame(Frame):
             while not done:
                 done = self.game.translate(1)
 
-        # Pause game or restart
+        # Game un-paused
         elif key in b[data.PAUSE] and self.un_paused:
             self.un_paused = False
             self.after_cancel(self.gravity_after_id)
@@ -588,6 +631,17 @@ class GameFrame(Frame):
             self.speed_index_int_var.get()
         )
 
+    def change_shape_set(self):
+        self.draw_shape(erase=True)
+        self.game.change_shape_set(self.shape_set.get())
+        for slot in range(self.game.shape_size):
+            self.stockpile[slot].redraw_shape(
+                self.cs,
+                self.shape_set.get(),
+                self.game.stockpile[slot]
+            )
+        self.draw_shape()
+
     def set_color_scheme(self, *args):
         """
         a trace method associated with
@@ -598,7 +652,11 @@ class GameFrame(Frame):
 
         # redraw the next shape canvas
         self.next_shape.canvas.configure(bg=self.cs['bg'])
-        self.next_shape.redraw_shape(self.cs, self.game.next_shape)
+        self.next_shape.redraw_shape(
+            self.cs,
+            self.shape_set.get(),
+            self.game.next_shape.name
+        )
 
         # redraw the main canvas
         self.canvas.configure(bg=self.cs['bg'])
@@ -610,10 +668,14 @@ class GameFrame(Frame):
         self.draw_shape()
 
         # redraw each slot in the stockpile
-        for slot in range(len(self.stockpile)):
+        for slot in range(self.game.shape_size):
             shape_frame: ShapeFrame = self.stockpile[slot]
             shape_frame.canvas.configure(bg=self.cs['bg'])
-            shape_frame.redraw_shape(self.cs, self.game.stockpile[slot])
+            shape_frame.redraw_shape(
+                self.cs,
+                self.shape_set.get(),
+                self.game.stockpile[slot]
+            )
 
 
 class TetrisApp(Tk):
@@ -623,19 +685,20 @@ class TetrisApp(Tk):
     """
     shape_size: int
     speed_index_int_var: IntVar
+    shapes_string_var: StringVar
     cs_string_var: StringVar
     players: tuple
 
     def configure_menu(self):
-        menu = Menu(self)
-        self.configure(menu=menu)
+        menu_bar = Menu(self)
+        self.configure(menu=menu_bar)
 
         # controls command
-        menu.add_command(label='controls', command=self.popup_controls)
+        menu_bar.add_command(label='controls', command=self.popup_controls)
 
         # speed menu
-        speed_menu = Menu(menu)
-        menu.add_cascade(label='speed', menu=speed_menu)
+        speed_menu = Menu(menu_bar)
+        menu_bar.add_cascade(label='speed', menu=speed_menu)
         self.speed_index_int_var = IntVar()
         for speed_string, scalar in data.FREQ_SCALAR_KEYS.items():
             speed_menu.add_radiobutton(
@@ -644,9 +707,21 @@ class TetrisApp(Tk):
             )
         speed_menu.invoke(speed_menu.index('1.00x'))
 
+        # shapes menu
+        shapes_menu = Menu(menu_bar)
+        menu_bar.add_cascade(label='shapes', menu=shapes_menu)
+        self.shapes_string_var = StringVar()
+        self.shapes_string_var.set('default')
+        for shape_set in data.SHAPES[self.shape_size].keys():
+            shapes_menu.add_radiobutton(
+                label=shape_set, value=shape_set,
+                variable=self.shapes_string_var
+            )
+        shapes_menu.invoke(shapes_menu.index('default'))
+
         # color menu
-        colors_menu = Menu(menu)
-        menu.add_cascade(label='colors', menu=colors_menu)
+        colors_menu = Menu(menu_bar)
+        menu_bar.add_cascade(label='colors', menu=colors_menu)
         self.cs_string_var = StringVar()
         for scheme in data.COLOR_SCHEMES[self.shape_size].keys():
             colors_menu.add_radiobutton(

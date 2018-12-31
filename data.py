@@ -4,26 +4,29 @@ from math import log
 from shapes import Shape
 
 DEFAULT_SHAPE_SIZE = 4
+SHAPE_EMPTY_NAME = ' '
 SHAPES = {
     4: {
-        'I': Shape(((-1, 0),  (0, 0),  (1, 0),  (2, 0)),   'I'),
-        'J': Shape(((-1, 0),  (0, 0),  (1, 0),  (1, -1)),  'J'),
-        'L': Shape(((-1, 0),  (0, 0),  (1, 0),  (-1, -1)), 'L'),
-        'O': Shape(((0, 0),   (1, 0),  (0, 1),  (1, 1)),   'O'),
-        'S': Shape(((-1, -1), (0, -1), (0, 0),  (1, 0)),   'S'),
-        'T': Shape(((-1, 0),  (0, 0),  (1, 0),  (0, -1)),  'T'),
-        'Z': Shape(((-1, 0),  (0, 0),  (0, -1), (1, -1)),  'Z')
+        'default': {
+            'I': Shape(((0, 0), (1, 0), (2, 0), (3, 0)), 'I'),
+            'J': Shape(((0, 1), (1, 1), (2, 1), (2, 0)), 'J'),
+            'L': Shape(((0, 1), (1, 1), (2, 1), (0, 0)), 'L'),
+            'O': Shape(((0, 0), (1, 0), (0, 1), (1, 1)), 'O'),
+            'S': Shape(((0, 0), (1, 0), (1, 1), (2, 1)), 'S'),
+            'T': Shape(((0, 1), (1, 1), (2, 1), (1, 0)), 'T'),
+            'Z': Shape(((0, 1), (1, 1), (1, 0), (2, 0)), 'Z')
+        }
     }
 }
 SHAPE_QUEUE_SIZE = 20
 
 
-def get_random_shape(shape_size: int, queue: list):
+def get_random_shape(shape_size: int, shape_set: str, queue: list):
     """
     takes a list of shape name fields
     """
     weights = {}
-    for key in SHAPES[shape_size].keys():
+    for key in SHAPES[shape_size][shape_set].keys():
         weights[key] = 1.0 / (2 ** queue.count(key))
     #  print(weights)
     total_weight = 0.0
@@ -31,9 +34,9 @@ def get_random_shape(shape_size: int, queue: list):
         total_weight += weight
 
     choice = random.uniform(0, total_weight)
-    for key in SHAPES[shape_size].keys():
+    for key in SHAPES[shape_size][shape_set].keys():
         if choice < weights[key]:
-            return SHAPES[shape_size][key]
+            return SHAPES[shape_size][shape_set][key]
         else:
             choice -= weights[key]
     assert False  # should never reach this statement

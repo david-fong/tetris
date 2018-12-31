@@ -2,17 +2,45 @@ MY GAME DECISIONS:
 stockpiles are of size <shape_size>
 using DTET rotations system
 
-ADDING YOUR OWN SHAPES:
-In data.py, there is a dictionary called SHAPES.
-    it maps shape sizes to a map from shape names (string) to Shape objects.
-    (this means that if you want custom shapes without default shapes,
-        you will need to delete the default shapes from this file.)
-A Shape is constructed with a list of coordinate pairs (also lists).
-    Each coordinate pair is an integer offset from a rotation coordinate pair.
-    The constructor expects that all coordinate pairs are distinct.
-    Some shapes you would expect the offset not to be in integers:
-        The constructor will handle this.
+NOTE: Any time you create settings for data related to a new shape size,
+You must create key bindings to access <shape size> stockpile slots.
 
-ADDING YOUR OWN COLOR SCHEMES:
-If you add more shape sizes,
-create mappings to access each stockpile slot if neccessary
+I. CREATING A NEW SHAPE SIZE, <n>:
+    You will need to:
+        1. Add a dictionary entry, <n> to data.SHAPES,
+           and add at least one key-value pair to it
+           where the key is the string 'default', and
+           its value is a dictionary of shapes with at
+           least one shape in it (see II).
+        2. Add a dictionary entry, <n> to data.COLOR_SCHEMES,
+           and add at least one key-value pair to it
+           where the key is the string 'default', and
+           its value is a color scheme (See III).
+
+II. ADDING YOUR OWN SHAPES (for an existing shape size):
+    See data.SHAPES:
+        It maps shape sizes to: a dict of named shape sets:
+            Ie. a dict from shape names (string) to Shape objects,
+                where the shapes consist of <shape size> or fewer tiles.
+        In your shape sets, use the shape names as those in the default shape set:
+            The colors from the default shapes will be used for your shapes.
+    A Shape is constructed with a list of coordinate pairs following these rules:
+        1. Each coordinate pair is in the first quadrant: x, y >= 0.
+        2. The base of the shape must be longer than its height.
+        3. The base and height cannot exceed <shape size>
+        3. The constructor expects that no coordinate pairs are duplicates.
+        Within the constraints of those rules, the orientation is up to you.
+        All rotation logic will be handled by the Shape constructor.
+    When you create a new shape, you must give it a color (see III below).
+
+III. ADDING YOUR OWN COLOR SCHEMES (for an existing shape size):
+    See data.COLOR_SCHEMES:
+        It maps shape sizes to: a color scheme:
+            Ie. a dict from existing shape names (See II) to color strings.
+    A color string may be an english word such as 'green', or a hex string.
+        Color words are system dependant. Not all words will work.
+        Hex strings consist of a '#' followed by six HEX digits.
+            (google 'hex color picker' for a helpful interface)
+
+IV. CREATING YOUR OWN KEY-BINDINGS (for an existing shape size):
+    See data.BINDINGS:

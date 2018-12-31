@@ -23,6 +23,7 @@ def start(event):
     # func()
 
 
+print(int(1.49), int(1.5), int(1.8))
 tuple_test = (0, 1, 2, 3, 4, 5, 6)
 data.get_random_shape(4, [])
 root = tkinter.Tk()
