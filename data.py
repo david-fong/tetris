@@ -94,6 +94,7 @@ THL = 'hard left'
 TSR = 'move right'
 THR = 'hard right'
 PAUSE = 'pause game'
+RESTART = 'restart the player\'s game'
 """
 all players should have the same pause keys
 """
@@ -109,7 +110,8 @@ DEFAULT_BINDINGS = {
             THL: ('A', ),
             TSR: ('d', 'Right'),
             THR: ('D', ),
-            PAUSE: ('Caps_Lock', )
+            PAUSE: ('Caps_Lock', ),
+            RESTART: ('Escape', )
         }
     },
     2: {
@@ -122,7 +124,8 @@ DEFAULT_BINDINGS = {
             THL: tuple(),
             TSR: ('d', ),
             THR: tuple(),
-            PAUSE: ('Caps_Lock', 'Space')
+            PAUSE: ('Caps_Lock', 'Space'),
+            RESTART: ('F', )
         },
         1: {
             RCC: ('u', ),
@@ -133,7 +136,8 @@ DEFAULT_BINDINGS = {
             THL: tuple(),
             TSR: ('l', ),
             THR: tuple(),
-            PAUSE: ('Caps_Lock', 'Space')
+            PAUSE: ('Caps_Lock', 'Space'),
+            RESTART: ('H', )
         }
     }
 }

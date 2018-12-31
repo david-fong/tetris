@@ -234,7 +234,6 @@ class ShapeFrame(Frame):
     def __init__(self, master: Frame, shape_size: int, name: str):
         super(ShapeFrame, self).__init__(master)
         self.master = master
-        self.pack()
 
         self.shape_size = shape_size
         self.pos = Pair(floor(shape_size / 2), floor(shape_size / 2))
@@ -257,6 +256,8 @@ class ShapeFrame(Frame):
                 row.append(canvas_id)
             canvas_ids.append(tuple(row))
         self.canvas_ids = tuple(canvas_ids)
+        self.canvas = canvas
+        canvas.pack()
 
         label = Label(self)
         label.configure(text=str(name))
@@ -287,6 +288,7 @@ class GameFrame(Frame):
     cs_string_var: StringVar
 
     canvas: Canvas              #
+    stockpile: list             #
 
     un_paused: bool             #
     score: StringVar            #
@@ -334,6 +336,17 @@ class GameFrame(Frame):
         self.canvas = canvas
         self.draw_shape()
 
+        # Configure the stockpile display
+        stockpile_frame = Frame(self)
+        stockpile = []
+        for slot in range(len(self.game.stockpile)):
+            shape_frame = ShapeFrame(stockpile_frame, self.game.shape_size, str(slot))
+            stockpile.append(shape_frame)  # TODO: make this dict from key_binding to ShapeFrame
+            shape_frame.grid(row=slot, column=0)
+        self.stockpile = stockpile
+        stockpile_frame.pack()
+
+        # Configure the score label
         self.score = StringVar()
         self.score.set('left-click to start')
         score_label = Label(self, textvariable=self.score)
@@ -404,6 +417,18 @@ class GameFrame(Frame):
         # Check to see if the game is over:
         self.spawn_next_shape()
 
+    def translate(self, direction: int = 0):
+        if self.game.translate(direction) and direction is 0:
+            self.set_curr_shape()
+
+    def stockpile_access(self, slot: int):
+        # TODO: Update canvases for slot
+        self.draw_shape(erase=True)
+        if self.game.stockpile_access(slot):
+            self.spawn_next_shape()
+        self.draw_shape()
+        return
+
     def gravity(self):
         """
         polling function that makes the
@@ -437,20 +462,8 @@ class GameFrame(Frame):
         else:
             self.master.bell()
 
-    def stockpile_access(self, slot: int):
-        # TODO: Update canvases for slot
-        self.draw_shape(erase=True)
-        if self.game.stockpile_access(slot):
-            self.spawn_next_shape()
-        self.draw_shape()
-        return
-
-    def translate(self, direction: int = 0):
-        if self.game.translate(direction) and direction is 0:
-            self.set_curr_shape()
-
     def decode_move(self, event):
-        if not hasattr(self, 'un_paused'):  # 'or not self.un_paused' removed for un_pause
+        if not hasattr(self, 'un_paused') or self.un_paused is None:
             return
 
         key = event.keysym
