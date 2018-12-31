@@ -154,16 +154,24 @@ def calculate_score(num_lines):
     return 2 * calculate_score(num_lines - 1) + 1
 
 
-FREQ_SCALAR = 2.0       # must be > 0
+FREQ_SCALAR_KEYS = {
+    '0.50x': 0,
+    '0.75x': 1,
+    '1.00x': 2,
+    '1.25x': 3,
+    '1.50x': 4
+}
+FREQ_SCALARS = (0.5, 0.75, 1.0, 1.25, 1.5)
 FREQ_BASE = 2.0         # must be > 1
 FREQ_OFFSET = 16.0      # must be > 0
 PERIOD_SOFT_DROP = 0.5  # 0.0 < this < 1.0
 PERIOD_GRANULARITY = 2
 
 
-def get_period(num_lines: int):
+def get_period(num_lines: int, freq_scalar_index: int):
     freq = (num_lines + FREQ_OFFSET + 1) / (FREQ_OFFSET + 1)
-    freq = FREQ_SCALAR * log(freq, FREQ_BASE) + 1
+    freq = 2 * log(freq, FREQ_BASE) + 1
+    freq *= FREQ_SCALARS[freq_scalar_index]
     return 1000 / freq
 
 

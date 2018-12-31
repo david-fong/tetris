@@ -1,6 +1,5 @@
 from math import floor
-import tkinter
-from tkinter import Tk, Frame, Canvas, Label, Menu, StringVar
+from tkinter import Tk, Frame, Canvas, Label, Menu, StringVar, IntVar, messagebox
 
 import data
 from shapes import *
@@ -238,6 +237,10 @@ class ShapeFrame(Frame):
         self.shape_size = shape_size
         self.pos = Pair(floor(shape_size / 2) - 1, floor(shape_size / 2))
 
+        label = Label(self)
+        label.configure(text=str(name))
+        label.pack()
+
         canvas = Canvas(self)
         canvas.configure(
             height=(data.canvas_dmn(shape_size) - data.GUI_CELL_PAD),
@@ -259,10 +262,6 @@ class ShapeFrame(Frame):
         self.canvas_ids = tuple(canvas_ids)
         self.canvas = canvas
         canvas.pack()
-
-        label = Label(self)
-        label.configure(text=str(name))
-        label.pack()
 
     def redraw_shape(self, cs: dict, shape: Shape):
         # clear all drawn tiles
@@ -288,6 +287,7 @@ class GameFrame(Frame):
     game: Game                  #
     bindings: dict              # map from special constant to a character
     cs: dict                    # a map from color swatches to actual color values
+    speed_index_int_var: IntVar
     cs_string_var: StringVar
 
     canvas: Canvas              #
@@ -309,23 +309,33 @@ class GameFrame(Frame):
         self.master = master
 
         game = Game(master.shape_size, num_rows, num_cols)
-        self.period = data.get_period(game.lines)
+        self.game = game
         self.bindings = bindings
         self.cs = data.COLOR_SCHEMES[game.shape_size]['default']
-        self.game = game
-
+        # Associate the parent's speed variable to update
+        self.speed_index_int_var = master.speed_index_int_var
+        self.speed_index_int_var.trace('w', self.set_period)
+        self.set_period()
+        # Associate the parent's color scheme variable to update
         self.cs_string_var = master.cs_string_var
         self.cs_string_var.trace('w', self.set_color_scheme)
 
-        # Configure the canvas
+        # Configure the score label
         game_frame = Frame(self)
         game_frame.pack(side='left')
+        self.score = StringVar()
+        self.score.set('left-click to start')
+        score_label = Label(game_frame, textvariable=self.score)
+        score_label.pack(side='top')
+
+        # Configure the canvas
         canvas = Canvas(game_frame, bg=self.cs['bg'])
         canvas.configure(
             height=(data.canvas_dmn(game.dmn.y) - data.GUI_CELL_PAD),
             width=(data.canvas_dmn(game.dmn.x) - data.GUI_CELL_PAD),
             relief='flat'
         )
+        # draw cells for each cell in the game
         for y in range(game.dmn.y):
             for x in range(game.dmn.x):
                 x0 = data.canvas_dmn(x)
@@ -350,16 +360,11 @@ class GameFrame(Frame):
                 self.game.shape_size,
                 self.cs, str(slot)
             )
-            stockpile.append(shape_frame)  # TODO: make this a dict from key_binding to ShapeFrame
+            # TODO: make stockpile a dict from key_binding to ShapeFrame?
+            stockpile.append(shape_frame)
             shape_frame.grid(row=slot, column=0)
         self.stockpile = stockpile
         stockpile_frame.pack(side='right')
-
-        # Configure the score label
-        self.score = StringVar()
-        self.score.set('left-click to start')
-        score_label = Label(game_frame, textvariable=self.score)
-        score_label.pack(side='top')
 
         self.master.bind('<Button-1>', self.start, '+')
         self.master.bind('<Key>', self.decode_move, '+')
@@ -412,7 +417,7 @@ class GameFrame(Frame):
         if y is not None:
             # Calculate the value to use as a period
             #  based on the total number of lines cleared
-            self.period = data.get_period(self.game.lines)
+            self.set_period()
             # Update the canvas
             for line in self.game.grid[y:self.game.dmn.y - self.game.ceil_len]:
                 for cell in line:
@@ -548,7 +553,21 @@ class GameFrame(Frame):
         self.after_cancel(self.gravity_after_id)
         return
 
+    def set_period(self, *args):
+        """
+        a trace method associated with
+        the parent window's speed menu.
+        """
+        self.period = data.get_period(
+            self.game.lines,
+            self.speed_index_int_var.get()
+        )
+
     def set_color_scheme(self, *args):
+        """
+        a trace method associated with
+        the parent window's color menu.
+        """
         schemes = data.COLOR_SCHEMES[self.game.shape_size]
         self.cs = schemes[self.cs_string_var.get()]
         for y in range(self.game.dmn.y):
@@ -567,11 +586,41 @@ class GameFrame(Frame):
 
 class TetrisApp(Tk):
     """
-
+    Implements a window.
+    contains a number of GameFrame Frames
     """
     shape_size: int
+    speed_index_int_var: IntVar
     cs_string_var: StringVar
     players: tuple
+
+    def configure_menu(self):
+        menu = Menu(self)
+        self.configure(menu=menu)
+
+        # controls command
+        menu.add_command(label='controls', command=self.popup_controls)
+
+        # speed menu
+        speed_menu = Menu(menu)
+        menu.add_cascade(label='speed', menu=speed_menu)
+        self.speed_index_int_var = IntVar()
+        for speed_string, scalar in data.FREQ_SCALAR_KEYS.items():
+            print(speed_string, scalar)
+            speed_menu.add_radiobutton(
+                label=speed_string, value=scalar,
+                variable=self.speed_index_int_var
+            )
+
+        # color menu
+        colors_menu = Menu(menu)
+        menu.add_cascade(label='colors', menu=colors_menu)
+        self.cs_string_var = StringVar()
+        for scheme in data.COLOR_SCHEMES[self.shape_size].keys():
+            colors_menu.add_radiobutton(
+                label=scheme, value=scheme,
+                variable=self.cs_string_var
+            )
 
     def __init__(self,
                  shape_size: int = data.DEFAULT_SHAPE_SIZE,
@@ -579,11 +628,15 @@ class TetrisApp(Tk):
                  num_cols: int = None,
                  num_players: int = 1):
         super(TetrisApp, self).__init__()
+        self.title('Tetris, by David Fong')
+        # self.iconbitmap('error')  # TODO: make a tetromino bitmap
+        self.focus_set()
 
         if shape_size not in data.SHAPES.keys():
             shape_size = data.DEFAULT_SHAPE_SIZE
         self.shape_size = shape_size
 
+        # Perform some cleaning
         if num_rows is None:
             num_rows = data.DEFAULT_NUM_ROWS[shape_size]
         elif num_rows < shape_size * 4:
@@ -596,17 +649,10 @@ class TetrisApp(Tk):
         if num_players not in data.DEFAULT_BINDINGS.keys():
             num_players = data.DEFAULT_NUM_PLAYERS
 
-        menu = Menu(self)
-        colors_menu = Menu(menu)
-        menu.add_cascade(label='colors', menu=colors_menu)
-        self.configure(menu=menu)
+        # Configure the menu
+        self.configure_menu()
 
-        self.cs_string_var = StringVar()
-        for scheme in data.COLOR_SCHEMES[self.shape_size].keys():
-            colors_menu.add_radiobutton(
-                label=scheme, value=scheme, variable=self.cs_string_var
-            )
-
+        # Create and pack GameFrame objects
         assert num_players > 0
         players = []
         for player_num in range(num_players):
@@ -618,8 +664,23 @@ class TetrisApp(Tk):
             players.append(player)
         self.players = tuple(players)
 
+    def popup_controls(self):
+        """
+        pops up a window for each player displaying their controls
+        """
+        for player_num in range(len(self.players)):
+            player: GameFrame = self.players[player_num]
+            title = 'controls - player #%d' % player_num
+            import pprint
+            message = pprint.pformat(player.bindings)
+            messagebox.showinfo(title, message, parent=self)
+        return
+
 
 def main():
+    # options = str(list(data.DEFAULT_BINDINGS.keys()))
+    # num_players = input('input a number of players in %s: ' % options)
+    # app = TetrisApp(num_players=int(num_players))
     app = TetrisApp(num_players=2)
     app.mainloop()
 
