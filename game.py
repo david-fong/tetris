@@ -288,8 +288,9 @@ class GameFrame(Frame):
     bindings: dict              # map from special constant to a character
     cs: dict                    # a map from color swatches to actual color values
     speed_index_int_var: IntVar
-    cs_string_var: StringVar
+    cs_string_var: StringVar    #
 
+    next_shape: ShapeFrame      #
     canvas: Canvas              #
     stockpile: list             #
 
@@ -298,37 +299,12 @@ class GameFrame(Frame):
     period: float               #
     gravity_after_id = None     # Alarm identifier for after_cancel()
 
-    def __init__(self, master: Tk,
-                 num_rows: int, num_cols: int,
-                 bindings: dict):
+    def configure_canvas(self, game_frame: Frame):
         """
-
+        initializes a canvas of rectangle items
+        corresponding to cells in the game field's grid
         """
-        assert isinstance(master, TetrisApp)
-        super(GameFrame, self).__init__(master)
-        self.master = master
-
-        game = Game(master.shape_size, num_rows, num_cols)
-        self.game = game
-        self.bindings = bindings
-        self.cs = data.COLOR_SCHEMES[game.shape_size]['default']
-        # Associate the parent's speed variable to update
-        self.speed_index_int_var = master.speed_index_int_var
-        self.speed_index_int_var.trace('w', self.set_period)
-        self.set_period()
-        # Associate the parent's color scheme variable to update
-        self.cs_string_var = master.cs_string_var
-        self.cs_string_var.trace('w', self.set_color_scheme)
-
-        # Configure the score label
-        game_frame = Frame(self)
-        game_frame.pack(side='left')
-        self.score = StringVar()
-        self.score.set('left-click to start')
-        score_label = Label(game_frame, textvariable=self.score)
-        score_label.pack(side='top')
-
-        # Configure the canvas
+        game = self.game
         canvas = Canvas(game_frame, bg=self.cs['bg'])
         canvas.configure(
             height=(data.canvas_dmn(game.dmn.y) - data.GUI_CELL_PAD),
@@ -351,6 +327,49 @@ class GameFrame(Frame):
         self.canvas = canvas
         self.draw_shape()
 
+    def __init__(self, master: Tk,
+                 num_rows: int, num_cols: int,
+                 bindings: dict):
+        """
+        initializes a GameFrame instance
+        """
+        assert isinstance(master, TetrisApp)
+        super(GameFrame, self).__init__(master)
+        self.master = master
+
+        game = Game(master.shape_size, num_rows, num_cols)
+        self.game = game
+        self.bindings = bindings
+        self.cs = data.COLOR_SCHEMES[game.shape_size]['default']
+        # Associate the parent's speed variable to update
+        self.speed_index_int_var = master.speed_index_int_var
+        self.speed_index_int_var.trace('w', self.set_period)
+        self.set_period()
+        # Associate the parent's color scheme variable to update
+        self.cs_string_var = master.cs_string_var
+        self.cs_string_var.trace('w', self.set_color_scheme)
+
+        game_frame = Frame(self)
+        game_frame.pack(side='left')
+
+        # Configure the next shape display
+        self.next_shape = ShapeFrame(
+            game_frame,
+            master.shape_size,
+            self.cs, 'next shape:'
+        )
+        self.next_shape.pack(side='top')
+        self.next_shape.redraw_shape(self.cs, self.game.next_shape)
+
+        # Configure the score label
+        self.score = StringVar()
+        self.score.set('left-click to start')
+        score_label = Label(game_frame, textvariable=self.score)
+        score_label.pack(side='top')
+
+        # Configure the canvas
+        self.configure_canvas(game_frame)
+
         # Configure the stockpile display
         stockpile_frame = Frame(self)
         stockpile = []
@@ -358,13 +377,13 @@ class GameFrame(Frame):
             shape_frame = ShapeFrame(
                 stockpile_frame,
                 self.game.shape_size,
-                self.cs, str(slot)
+                self.cs, ('slot ' + str(slot) + ':')
             )
             # TODO: make stockpile a dict from key_binding to ShapeFrame?
             stockpile.append(shape_frame)
             shape_frame.grid(row=slot, column=0)
         self.stockpile = stockpile
-        stockpile_frame.pack(side='right')
+        stockpile_frame.pack(side='bottom')
 
         self.master.bind('<Button-1>', self.start, '+')
         self.master.bind('<Key>', self.decode_move, '+')
@@ -393,8 +412,7 @@ class GameFrame(Frame):
             self.game_over()
         else:
             self.draw_shape()
-            # TODO: update next shape display:
-            #  self.gui.update_next_shape_canvas
+            self.next_shape.redraw_shape(self.cs, self.game.next_shape)
 
     def set_curr_shape(self):
         """
@@ -487,10 +505,11 @@ class GameFrame(Frame):
         if not hasattr(self, 'un_paused') or self.un_paused is None:
             return
 
-        key = event.keysym
         self.draw_shape(erase=True)
+        key = event.keysym
         b = self.bindings
 
+        # Un-pause game
         if not self.un_paused:
             if key in b[data.PAUSE]:
                 self.un_paused = True
@@ -498,14 +517,16 @@ class GameFrame(Frame):
                 self.draw_shape()
                 return
             else:
-                self.draw_shape()
+                self.draw_shape()  # Undo the erase first
                 return
 
+        # Rotation
         if key in b[data.RCC]:
             self.game.rotate(3)
         elif key in b[data.RCW]:
             self.game.rotate(1)
 
+        # Downward translation
         elif key in b[data.TSD]:
             self.after_cancel(self.gravity_after_id)
             self.translate()
@@ -518,6 +539,7 @@ class GameFrame(Frame):
             self.set_curr_shape()
             self.un_pause_gravity()
 
+        # Left translation
         elif key in b[data.TSL]:
             self.translate(3)
         elif key in b[data.THL]:
@@ -525,6 +547,7 @@ class GameFrame(Frame):
             while not done:
                 done = self.game.translate(3)
 
+        # Right translation
         elif key in b[data.TSR]:
             self.translate(1)
         elif key in b[data.THR]:
@@ -532,12 +555,14 @@ class GameFrame(Frame):
             while not done:
                 done = self.game.translate(1)
 
+        # Pause game or restart
         elif key in b[data.PAUSE] and self.un_paused:
             self.un_paused = False
             self.after_cancel(self.gravity_after_id)
         elif key in b[data.RESTART]:
             self.restart()
 
+        # Stockpile access
         else:
             try:
                 slot = int(key) - 1
@@ -570,14 +595,21 @@ class GameFrame(Frame):
         """
         schemes = data.COLOR_SCHEMES[self.game.shape_size]
         self.cs = schemes[self.cs_string_var.get()]
+
+        # redraw the next shape canvas
+        self.next_shape.canvas.configure(bg=self.cs['bg'])
+        self.next_shape.redraw_shape(self.cs, self.game.next_shape)
+
+        # redraw the main canvas
+        self.canvas.configure(bg=self.cs['bg'])
         for y in range(self.game.dmn.y):
             for cell in self.game.grid[y]:
                 self.canvas.itemconfigure(
                     cell.canvas_id, fill=self.cs[cell.key]
                 )
-        self.canvas.configure(bg=self.cs['bg'])
         self.draw_shape()
 
+        # redraw each slot in the stockpile
         for slot in range(len(self.stockpile)):
             shape_frame: ShapeFrame = self.stockpile[slot]
             shape_frame.canvas.configure(bg=self.cs['bg'])
@@ -606,11 +638,11 @@ class TetrisApp(Tk):
         menu.add_cascade(label='speed', menu=speed_menu)
         self.speed_index_int_var = IntVar()
         for speed_string, scalar in data.FREQ_SCALAR_KEYS.items():
-            print(speed_string, scalar)
             speed_menu.add_radiobutton(
                 label=speed_string, value=scalar,
                 variable=self.speed_index_int_var
             )
+        speed_menu.invoke(speed_menu.index('1.00x'))
 
         # color menu
         colors_menu = Menu(menu)
@@ -621,6 +653,7 @@ class TetrisApp(Tk):
                 label=scheme, value=scheme,
                 variable=self.cs_string_var
             )
+        colors_menu.invoke(colors_menu.index('default'))
 
     def __init__(self,
                  shape_size: int = data.DEFAULT_SHAPE_SIZE,
@@ -670,7 +703,7 @@ class TetrisApp(Tk):
         """
         for player_num in range(len(self.players)):
             player: GameFrame = self.players[player_num]
-            title = 'controls - player #%d' % player_num
+            title = 'controls - player #%d' % (player_num + 1)
             import pprint
             message = pprint.pformat(player.bindings)
             messagebox.showinfo(title, message, parent=self)

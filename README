@@ -1,0 +1,18 @@
+MY GAME DECISIONS:
+stockpiles are of size <shape_size>
+using DTET rotations system
+
+ADDING YOUR OWN SHAPES:
+In data.py, there is a dictionary called SHAPES.
+    it maps shape sizes to a map from shape names (string) to Shape objects.
+    (this means that if you want custom shapes without default shapes,
+        you will need to delete the default shapes from this file.)
+A Shape is constructed with a list of coordinate pairs (also lists).
+    Each coordinate pair is an integer offset from a rotation coordinate pair.
+    The constructor expects that all coordinate pairs are distinct.
+    Some shapes you would expect the offset not to be in integers:
+        The constructor will handle this.
+
+ADDING YOUR OWN COLOR SCHEMES:
+If you add more shape sizes,
+create mappings to access each stockpile slot if neccessary

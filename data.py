@@ -93,6 +93,7 @@ TSL = 'move left'
 THL = 'hard left'
 TSR = 'move right'
 THR = 'hard right'
+STOCKPILE = 'access a slot in the stockpile'
 PAUSE = 'pause game'
 RESTART = 'restart the player\'s game'
 """
@@ -110,6 +111,9 @@ DEFAULT_BINDINGS = {
             THL: ('A', ),
             TSR: ('d', 'Right'),
             THR: ('D', ),
+            STOCKPILE: (
+
+            ),
             PAUSE: ('Caps_Lock', ),
             RESTART: ('Escape', )
         }
@@ -124,6 +128,7 @@ DEFAULT_BINDINGS = {
             THL: tuple(),
             TSR: ('d', ),
             THR: tuple(),
+            STOCKPILE: (),
             PAUSE: ('Caps_Lock', 'Space'),
             RESTART: ('F', )
         },
@@ -136,6 +141,7 @@ DEFAULT_BINDINGS = {
             THL: tuple(),
             TSR: ('l', ),
             THR: tuple(),
+            STOCKPILE: (),
             PAUSE: ('Caps_Lock', 'Space'),
             RESTART: ('H', )
         }
