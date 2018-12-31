@@ -1,3 +1,9 @@
+from math import floor
+from tkinter import Frame, Canvas, Label
+
+import data
+
+
 class Pair:
     x: int
     y: int
@@ -129,3 +135,55 @@ class Shape:
             return pair.y
         else:
             return pair.x
+
+
+class ShapeFrame(Frame):
+    master: Frame
+    shape_size: int
+    pos: Pair
+    canvas: Canvas
+    canvas_ids: tuple   # 2D tuple of canvas item ids
+
+    def __init__(self, master: Frame, shape_size: int, name: str):
+        super().__init__(master)
+        self.master = master
+        self.pack()
+
+        self.shape_size = shape_size
+        self.pos = Pair(floor(shape_size / 2), floor(shape_size / 2))
+
+        canvas = Canvas(self)
+        canvas.configure(
+            height=(data.canvas_dmn(shape_size) - data.GUI_CELL_PAD),
+            width=(data.canvas_dmn(shape_size) - data.GUI_CELL_PAD)
+        )
+        canvas_ids = []
+        for y in range(shape_size):
+            row = []
+            for x in range(shape_size):
+                x0 = data.canvas_dmn(x)
+                y0 = data.canvas_dmn(shape_size - 1 - y)
+                canvas_id = canvas.create_rectangle(
+                    x0, y0, x0 + data.GUI_CELL_WID, y0 + data.GUI_CELL_WID,
+                    width=0
+                )
+                row.append(canvas_id)
+            canvas_ids.append(tuple(row))
+        self.canvas_ids = tuple(canvas_ids)
+
+        label = Label(self)
+        label.configure(text=str(name))
+        label.pack()
+
+    def redraw_shape(self, cs: dict, shape: Shape):
+        key = cs[shape.name]
+        # clear all drawn tiles
+        self.canvas.itemconfigure('ALL', fill=cs[data.CELL_EMPTY_KEY])
+        for t in shape.tiles:
+            canvas_id = self.id_at_tile(t.p[0])
+            self.canvas.configure(canvas_id, fill=cs[key])
+
+    def id_at_tile(self, p: Pair):
+        x = self.pos.x + p.x
+        y = self.pos.y + p.y
+        return self.canvas_ids[y][x]

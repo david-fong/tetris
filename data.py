@@ -19,19 +19,13 @@ SHAPE_QUEUE_SIZE = 20
 
 def get_random_shape(shape_size: int, queue: list):
     """
-    takes a list of shapes
+    takes a list of shape name fields
     """
     weights = {}
     for key in SHAPES[shape_size].keys():
-        weights[key] = queue.count(key) + 1
-    queue_size = 0
-    for weight in weights.values():
-        queue_size += weight
-
-    for key in weights.keys():
-        weights[key] = queue_size / weights.get(key)
+        weights[key] = 1.0 / (2 ** queue.count(key))
     #  print(weights)
-    total_weight = 0
+    total_weight = 0.0
     for weight in weights.values():
         total_weight += weight
 
@@ -41,7 +35,7 @@ def get_random_shape(shape_size: int, queue: list):
             return SHAPES[shape_size][key]
         else:
             choice -= weights[key]
-    assert False
+    assert False  # should never reach this statement
 
 
 CELL_EMPTY_KEY = ' '
@@ -55,7 +49,6 @@ COLOR_SCHEMES = {
     4: {
         'default': {
             'bg': 'gray20',
-            'key': 'white',
             CELL_EMPTY_KEY: 'black',
             'I': 'cyan',
             'J': 'blue',
@@ -67,7 +60,6 @@ COLOR_SCHEMES = {
         },
         'black & white': {
             'bg': 'gray20',
-            'key': 'white',
             CELL_EMPTY_KEY: 'black',
             'I': 'white',
             'J': 'white',
@@ -79,7 +71,6 @@ COLOR_SCHEMES = {
         },
         'pastel': {
             'bg': '#FFFFFF',
-            'key': '#F4F4F4',
             CELL_EMPTY_KEY: '#F4F4F4',
             'I': '#76F7E4',
             'J': '#FFBE63',
@@ -93,18 +84,6 @@ COLOR_SCHEMES = {
 }
 
 
-def get_color_scheme(shape_size: int, key: str):
-    """
-    returns the dictionary corresponding to key
-    and that corresponding to 'default' if key
-    does not exist
-    """
-    try:
-        return COLOR_SCHEMES[shape_size][key]
-    except KeyError:
-        return COLOR_SCHEMES[shape_size]['default']
-
-
 RCC = 0
 RCW = 1
 TSD = 2
@@ -113,15 +92,17 @@ TSL = 4
 TSR = 5
 THL = 6
 THR = 7
+PAUSE = 8
 DEFAULT_BINDINGS = {
-    RCC: 'q',
-    RCW: 'e',
-    TSD: 's',
-    THD: 'S ',
-    TSL: 'a',
-    TSR: 'd',
-    THL: 'A',
-    THR: 'D'
+    RCC: ('q', ),
+    RCW: ('e', ),
+    TSD: ('s', ),
+    THD: ('S', 'space'),
+    TSL: ('a', 'Left'),
+    TSR: ('d', 'Right'),
+    THL: ('A', ),
+    THR: ('D', ),
+    PAUSE: ('Caps_Lock', )
 }
 
 
@@ -148,11 +129,11 @@ def get_period(num_lines: int):
     return 1000 / freq
 
 
-NUM_ROWS = {
+DEFAULT_NUM_ROWS = {
     4: 20
 }
 
-NUM_COLS = {
+DEFAULT_NUM_COLS = {
     4: 10
 }
 

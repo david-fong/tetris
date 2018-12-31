@@ -16,7 +16,10 @@ def func():
 
 
 def start(event):
-    print(event.char)
+    print('char: ' + event.char)
+    print('keysym: ' + event.keysym)
+    print('state: ' + str(event.state))
+    print('keycode: ' + str(event.keycode))
     # func()
 
 

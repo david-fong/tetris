@@ -1,8 +1,7 @@
 from math import floor
 import tkinter
-from tkinter import Frame, Canvas, Button, Menu, colorchooser, StringVar, Label
+from tkinter import Menu, colorchooser, StringVar
 
-import data
 from shapes import *
 
 
@@ -71,7 +70,7 @@ class Game:
                  num_rows: int = None,
                  num_cols: int = None
                  ):
-        assert isinstance(gui, GUI)
+        assert isinstance(gui, GameFrame)
         self.gui = gui
         self.shape_size = shape_size
 
@@ -79,11 +78,11 @@ class Game:
         # to make sure user doesn't give
         # themselves a bad time
         if num_rows is None:
-            num_rows = data.NUM_ROWS[shape_size]
+            num_rows = data.DEFAULT_NUM_ROWS[shape_size]
         elif num_rows < shape_size * 4:
             num_rows = shape_size * 4
         if num_cols is None:
-            num_cols = data.NUM_COLS[shape_size]
+            num_cols = data.DEFAULT_NUM_COLS[shape_size]
         elif num_cols < shape_size * 2:
             num_cols = shape_size * 2
 
@@ -100,7 +99,7 @@ class Game:
         self.grid = tuple(grid)
 
         self.stockpile = []
-        for i in range(data.STOCKPILE_CAPACITY):
+        for i in range(self.shape_size):
             self.stockpile.append(None)
 
         # spawn the first shape
@@ -242,52 +241,7 @@ class Game:
         return to_string
 
 
-class UserKey(Button):
-    bind_id: int
-    master: Frame
-    button: Button
-
-    def __init__(self, master: Frame):
-        super().__init__(master)
-        self.master = master
-
-        self.configure(
-            height=data.GUI_CELL_WID,
-            width=data.GUI_CELL_WID,
-            bg='white',
-            text='key'
-        )
-
-    def bind(self, sequence=None, func=None, add=None):
-        self.configure(command=func)
-        return  # TODO
-
-
-class KeyFrame(Frame):
-    master: Frame
-    mappings: dict
-
-    def __init__(self, master: Frame):
-        super().__init__(master)
-        self.master = master
-        self.pack()
-
-        top = Frame(self)
-        top.pack('top')
-        rotate_cc = UserKey(top)
-        rotate_cc.pack('left')
-
-        self.mappings = {
-            'rotate_cc': UserKey,
-            'rotate_cw': UserKey,
-            'hard_drop': UserKey,
-            'soft_drop': UserKey,
-            'move_left': UserKey,
-            'move_right': UserKey
-        }
-
-
-class GUI(Frame):
+class GameFrame(Frame):
     """
 
     """
@@ -295,71 +249,58 @@ class GUI(Frame):
     game: Game                  #
     bindings: dict              # map from special constant to a character
     cs: dict                    # a map from color swatches to actual color values
-    cs_id: StringVar
+    cs_string_var: StringVar
 
-    menu: Menu                  #
     canvas: Canvas              #
-    virtual_kbd: Frame          # emulates buttons used for playing
 
-    un_paused: bool               #
+    un_paused: bool             #
     score: StringVar            #
     period: float               #
-    soft_drop: bool = False     #
     gravity_after_id = None     # Alarm identifier for after_cancel()
 
-    def __init__(self, master):
+    def __init__(self, master, cs_string_var):
         """
 
         """
         super().__init__(master)
         self.master = master
-        self.master.focus_set()
         self.pack()
 
         game = Game(self)
-        self.game = game
-        self.period = data.get_period(self.game.lines)
+        self.period = data.get_period(game.lines)
         self.bindings = data.get_default_bindings()
         self.cs = data.COLOR_SCHEMES[game.shape_size]['default']
+        self.game = game
 
-        menu = Menu(master)
-        self.menu = menu
-        self.master.configure(menu=menu)
-        colors_menu = Menu(menu)
-        self.cs_id = StringVar()
-        self.cs_id.trace('w', self.set_color_scheme)
-        menu.add_cascade(label='colors', menu=colors_menu)
-        for scheme in data.COLOR_SCHEMES[self.game.shape_size].keys():
-            colors_menu.add_radiobutton(
-                label=scheme, value=scheme, variable=self.cs_id
-            )
+        self.cs_string_var = cs_string_var
+        self.cs_string_var.trace('w', self.set_color_scheme)
 
         # Configure the canvas
         canvas = Canvas(self.master, bg=self.cs['bg'])
-        self.canvas = canvas
-        self.canvas.pack(side='left')
-        self.canvas['height'] = data.canvas_dmn(game.dmn.y)
-        self.canvas['width'] = data.canvas_dmn(game.dmn.x)
-        self.canvas['relief'] = 'flat'
+        canvas.configure(
+            height=(data.canvas_dmn(game.dmn.y) - data.GUI_CELL_PAD),
+            width=(data.canvas_dmn(game.dmn.x) - data.GUI_CELL_PAD),
+            relief='flat'
+        )
         for y in range(game.dmn.y):
             for x in range(game.dmn.x):
                 x0 = data.canvas_dmn(x)
                 y0 = data.canvas_dmn(game.dmn.y - 1 - y)
                 # create a rectangle canvas item
-                #  and link it to a Cell object
+                # and link it to a Cell object
                 cell = game.grid[y][x]
-                cell.canvas_id = self.canvas.create_rectangle(
+                cell.canvas_id = canvas.create_rectangle(
                     x0, y0, x0 + data.GUI_CELL_WID, y0 + data.GUI_CELL_WID,
                     fill=self.cs[cell.key], tags='%d' % y, width=0
                 )
+        canvas.pack()
+        self.canvas = canvas
+
         self.score = StringVar()
         self.score.set('left-click to start')
-        score_label = Label(self, textvariable=self.score, anchor='nw')
+        score_label = Label(self, textvariable=self.score)
         score_label.pack()
         self.draw_shape()
-
-        self.virtual_kbd = Frame(self.master, bg=self.cs['bg'])
-        self.virtual_kbd.pack(side='right')
 
         self.master.bind('<Button-1>', self.start)
         self.master.bind('<Key>', self.decode_move)
@@ -431,6 +372,10 @@ class GUI(Frame):
         polling function that makes the
         current shape periodically fall
         """
+        # terminating condition at game over
+        if self.un_paused is None:
+            return
+
         self.draw_shape(erase=True)
         if self.game.translate():
             self.set_curr_shape()
@@ -468,16 +413,24 @@ class GUI(Frame):
             self.set_curr_shape()
 
     def decode_move(self, event):
-        if not self.un_paused or not hasattr(self, 'un_paused'):
+        if not hasattr(self, 'un_paused'):  # 'or not self.un_paused' removed for un_pause
             return
 
-        key = event.char
-        if key is '':
-            return  # SHIFT key. ignore.
+        key = event.keysym
         self.draw_shape(erase=True)
         b = self.bindings
 
-        if key is b[data.RCC]:
+        if not self.un_paused:
+            if key in b[data.PAUSE]:
+                self.un_paused = True
+                self.un_pause_gravity()
+                self.draw_shape()
+                return
+            else:
+                self.draw_shape()
+                return
+
+        if key in b[data.RCC]:
             self.game.rotate(3)
         elif key in b[data.RCW]:
             self.game.rotate(1)
@@ -496,17 +449,21 @@ class GUI(Frame):
 
         elif key in b[data.TSL]:
             self.translate(3)
-        elif key in b[data.TSR]:
-            self.translate(1)
-
         elif key in b[data.THL]:
             done = self.game.translate(3)
             while not done:
                 done = self.game.translate(3)
+
+        elif key in b[data.TSR]:
+            self.translate(1)
         elif key in b[data.THR]:
             done = self.game.translate(1)
             while not done:
                 done = self.game.translate(1)
+
+        elif key in b[data.PAUSE] and self.un_paused:
+            self.un_paused = False
+            self.after_cancel(self.gravity_after_id)
 
         else:
             try:
@@ -523,12 +480,11 @@ class GUI(Frame):
         print(self.gravity_after_id)
         self.un_paused = None
         self.after_cancel(self.gravity_after_id)
-        # TODO:
         return
 
     def set_color_scheme(self, *args):
         schemes = data.COLOR_SCHEMES[self.game.shape_size]
-        self.cs = schemes[self.cs_id.get()]
+        self.cs = schemes[self.cs_string_var.get()]
         for y in range(self.game.dmn.y):
             for cell in self.game.grid[y]:
                 self.canvas.itemconfigure(
@@ -538,12 +494,21 @@ class GUI(Frame):
         self.draw_shape()
 
 
-def main():
+class TetrisApp(tkinter.Tk):
     """
 
     """
     root = tkinter.Tk()
-    gui = GUI(root)
+    menu = Menu(root)
+    colors_menu = Menu(menu)
+    menu.add_cascade(label='colors', menu=colors_menu)
+    cs_string_var = StringVar()
+    root.configure(menu=menu)
+    gui = GameFrame(root, cs_string_var)
+    for scheme in data.COLOR_SCHEMES[gui.game.shape_size].keys():
+        colors_menu.add_radiobutton(
+            label=scheme, value=scheme, variable=cs_string_var
+        )
     gui.mainloop()
 
 
