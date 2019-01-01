@@ -76,6 +76,8 @@ class Shape:
 
     Orient the default position following
     rule: height <= base.
+    The game using this shape will require
+    that base, height <= shape_size.
     """
 
     name: str

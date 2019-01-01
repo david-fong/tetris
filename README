@@ -14,6 +14,7 @@ I. CREATING A NEW SHAPE SIZE, <n>:
            its value is a color scheme (See III).
         3. Ensure that there are enough keybindings to
            access <n> slots (see III).
+        4. Add to data.DEFAULT_NUM_ROWS/COLS.
 
 II. ADDING YOUR OWN SHAPES (for an existing shape size):
     See data.SHAPES:
@@ -25,7 +26,7 @@ II. ADDING YOUR OWN SHAPES (for an existing shape size):
     A Shape is constructed with a list of coordinate pairs following these rules:
         1. Each coordinate pair is in the first quadrant: x, y >= 0.
         2. The base of the shape must be longer than its height.
-        3. The base and height cannot exceed <shape size>
+        3. The base and height cannot exceed <shape size>.
         3. The constructor expects that no coordinate pairs are duplicates.
         Within the constraints of those rules, the orientation is up to you.
         All rotation logic will be handled by the Shape constructor.
@@ -46,4 +47,5 @@ IV. CREATING YOUR OWN KEY-BINDINGS (for an existing shape size):
             Ie. a dictionary from an action's special constant to a list of
             keysyms (strings) for a given player to perform that action.
     Run keysym.py, and press a key to display its keysym in the created window.
-    Ideally, all players share the same bindings to pause the game
+    Ideally, all players share the same bindings to pause the game.
+    Avoid using 'Caps_Lock' for any key bindings, since other keys are case sensitive

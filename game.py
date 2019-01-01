@@ -794,10 +794,9 @@ class TetrisApp(Tk):
 
 
 def main():
-    # options = str(list(data.DEFAULT_BINDINGS.keys()))
-    # num_players = input('input a number of players in %s: ' % options)
-    # app = TetrisApp(num_players=int(num_players))
-    app = TetrisApp(num_players=2)
+    options = str(list(data.DEFAULT_BINDINGS.keys()))
+    num_players = input('input a number of players in %s: ' % options)
+    app = TetrisApp(num_players=int(num_players))
     app.mainloop()
 
 

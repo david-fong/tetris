@@ -151,17 +151,17 @@ DEFAULT_NUM_PLAYERS = 1
 DEFAULT_BINDINGS = {
     1: {
         0: {
-            RCC: ('q', ),
-            RCW: ('e', ),
+            RCC: ('q', 'j'),
+            RCW: ('e', 'k'),
             TSD: ('s', ),
             THD: ('S', 'w', 'space'),
             TSL: ('a', 'Left'),
             THL: ('A', ),
             TSR: ('d', 'Right'),
             THR: ('D', ),
-            STOCKPILE: (('1', 'z'), ('2', 'x'), ('3', 'c'), ('4', 'v'), ('5', ), ('6', )),
-            PAUSE: ('Caps_Lock', ),
-            RESTART: ('Escape', )
+            STOCKPILE: (('1', 'z'), ('2', 'x'), ('3', 'c'), ('4', 'v')),
+            PAUSE: ('Escape', ),
+            RESTART: ('F', )
         }
     },
     2: {
@@ -175,7 +175,7 @@ DEFAULT_BINDINGS = {
             TSR: ('d', ),
             THR: tuple(),
             STOCKPILE: (('1', 'z'), ('2', 'x'), ('3', 'c'), ('4', 'v')),
-            PAUSE: ('Caps_Lock', 'Space'),
+            PAUSE: ('Escape', 'Space'),
             RESTART: ('F', )
         },
         1: {
@@ -188,7 +188,7 @@ DEFAULT_BINDINGS = {
             TSR: ('l', ),
             THR: tuple(),
             STOCKPILE: (('7', 'b'), ('8', 'n'), ('9', 'm'), ('0', 'comma')),
-            PAUSE: ('Caps_Lock', 'Space'),
+            PAUSE: ('Escape', 'Space'),
             RESTART: ('H', )
         }
     }
