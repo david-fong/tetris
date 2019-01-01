@@ -209,6 +209,13 @@ class Game:
         return True
 
     def restart(self):
+        self.lines = 0
+        self.combo = 0
+        self.score = data.calculate_score(self.lines)
+
+        # TODO: add a HIGH_SCORES dict to data?
+        #  would be cool if it saved by player name too.
+
         for line_num in range(self.dmn.y):
             for cell in self.grid[line_num]:
                 cell.clear()
@@ -567,10 +574,13 @@ class GameFrame(Frame):
     def decode_move(self, event):
         key = event.keysym
         b = self.bindings
+        if not hasattr(self, 'un_paused'):
+            return  # game hasn't even started yet
         if key in b[data.RESTART]:
             self.restart()
-        elif not hasattr(self, 'un_paused') or self.un_paused is None:
             return
+        if self.un_paused is None:
+            return  # game is paused
         self.draw_shape(erase=True)
 
         # Game paused
