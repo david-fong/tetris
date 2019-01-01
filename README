@@ -1,3 +1,20 @@
+game.py: RUN THIS TO PLAY A GAME OF TETRIS
+    Cell: An entry in a Game object's grid
+    Game: Contains all representation of a game
+    ShapeFrame: Displays a Shape object
+    GameFrame: Displays and interfaces for a Game object
+    TetrisApp: Packs a number of GameFrames together
+
+shapes.py: file with classes for representing shapes
+    Pair: A coordinate pair that can produce a shifted version of itself
+    Tile: A pair with four views (one for each 90 degree rotation around a pivot)
+    Shape: A collection of Tile objects sharing pivot behaviour
+
+data.py: file with dictionaries used by game.py
+    Instructions to edit for custom game settings below...
+
+=====================================================================================
+
 NOTE: Any time you create settings for data related to a new shape size,
 You must create key bindings to access <shape size> stockpile slots.
 
