@@ -85,6 +85,7 @@ class Shape:
     def __init__(self, pairs: ((int, int), ), name: str):
         self.name = name
 
+        assert len(pairs) > 0
         for p in pairs:
             assert p[0] >= 0 and p[1] >= 0
 

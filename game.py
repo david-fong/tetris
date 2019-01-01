@@ -211,8 +211,9 @@ class Game:
     def change_shape_set(self, shape_set: str):
         not_compatible: bool = False
         if self.shape_set is not None:
+            # Check to see if the key sets (shape names) are the same
             for key in data.SHAPES[self.shape_size][self.shape_set].keys():
-                if key not in data.SHAPES[self.shape_set][shape_set].keys():
+                if key not in data.SHAPES[self.shape_size][shape_set].keys():
                     not_compatible = True
                     break
         else:
@@ -220,14 +221,15 @@ class Game:
 
         self.shape_set = shape_set
         if not_compatible:
+            # Clear previous shape data and stockpile
             self.prev_shapes = []
             self.stockpile = []
             for i in range(self.shape_size):
                 self.stockpile.append(data.SHAPE_EMPTY_NAME)
-            self.next_shape = data.get_random_shape(
-                self.shape_size, self.shape_set, self.prev_shapes
-            )
 
+        self.next_shape = data.get_random_shape(
+            self.shape_size, self.shape_set, self.prev_shapes
+        )
         self.spawn_next_shape()
 
     def cell_at_tile(self, p: Pair):
@@ -248,7 +250,7 @@ class Game:
 
 
 class ShapeFrame(Frame):
-    master: Frame
+    parent_game = None
     shape_size: int
     pos: Pair
     canvas: Canvas
@@ -256,7 +258,8 @@ class ShapeFrame(Frame):
 
     def __init__(self, master: Frame, shape_size: int, cs: dict, name: str):
         super(ShapeFrame, self).__init__(master)
-        self.master = master
+        self.parent_game = master.master
+        assert isinstance(self.parent_game, GameFrame)
 
         self.shape_size = shape_size
         self.pos = Pair(int(shape_size / 2), int(shape_size / 2))
@@ -287,13 +290,16 @@ class ShapeFrame(Frame):
         self.canvas = canvas
         canvas.pack()
 
-    def redraw_shape(self, cs: dict, shape_set: str, name: str):
+    def redraw_shape(self, name: str):
         # clear all drawn tiles
-        self.canvas.itemconfigure('all', fill=cs[data.CELL_EMPTY_KEY])
+        self.canvas.itemconfigure(
+            'all', fill=self.parent_game.cs[data.CELL_EMPTY_KEY]
+        )
 
+        shape_set = data.SHAPES[self.shape_size][self.parent_game.shape_set.get()]
         if name is not data.SHAPE_EMPTY_NAME:
-            color = cs[name]
-            for t in data.SHAPES[self.shape_size][shape_set][name].tiles:
+            color = self.parent_game.cs[name]
+            for t in shape_set[name].tiles:
                 canvas_id = self.id_at_tile(t.p[0])
                 self.canvas.itemconfigure(canvas_id, fill=color)
 
@@ -399,11 +405,7 @@ class GameFrame(Frame):
             self.cs, 'next shape:'
         )
         self.next_shape.pack(side='top')
-        self.next_shape.redraw_shape(
-            self.cs,
-            self.shape_set.get(),
-            self.game.next_shape.name
-        )
+        self.next_shape.redraw_shape(self.game.next_shape.name)
 
         # Configure the canvas
         self.configure_canvas(game_frame)
@@ -450,11 +452,7 @@ class GameFrame(Frame):
             self.game_over()
         else:
             self.draw_shape()
-            self.next_shape.redraw_shape(
-                self.cs,
-                self.shape_set.get(),
-                self.game.next_shape.name
-            )
+            self.next_shape.redraw_shape(self.game.next_shape.name)
 
     def set_curr_shape(self):
         """
@@ -501,11 +499,7 @@ class GameFrame(Frame):
             self.spawn_next_shape()
         self.draw_shape()
 
-        self.stockpile[slot].redraw_shape(
-            self.cs,
-            self.shape_set.get(),
-            self.game.stockpile[slot]
-        )
+        self.stockpile[slot].redraw_shape(self.game.stockpile[slot])
 
     def gravity(self):
         """
@@ -631,15 +625,13 @@ class GameFrame(Frame):
             self.speed_index_int_var.get()
         )
 
-    def change_shape_set(self):
+    def change_shape_set(self, *args):
         self.draw_shape(erase=True)
         self.game.change_shape_set(self.shape_set.get())
+
+        self.next_shape.redraw_shape(self.game.next_shape.name)
         for slot in range(self.game.shape_size):
-            self.stockpile[slot].redraw_shape(
-                self.cs,
-                self.shape_set.get(),
-                self.game.stockpile[slot]
-            )
+            self.stockpile[slot].redraw_shape(self.game.stockpile[slot])
         self.draw_shape()
 
     def set_color_scheme(self, *args):
@@ -652,11 +644,7 @@ class GameFrame(Frame):
 
         # redraw the next shape canvas
         self.next_shape.canvas.configure(bg=self.cs['bg'])
-        self.next_shape.redraw_shape(
-            self.cs,
-            self.shape_set.get(),
-            self.game.next_shape.name
-        )
+        self.next_shape.redraw_shape(self.game.next_shape.name)
 
         # redraw the main canvas
         self.canvas.configure(bg=self.cs['bg'])
@@ -671,11 +659,7 @@ class GameFrame(Frame):
         for slot in range(self.game.shape_size):
             shape_frame: ShapeFrame = self.stockpile[slot]
             shape_frame.canvas.configure(bg=self.cs['bg'])
-            shape_frame.redraw_shape(
-                self.cs,
-                self.shape_set.get(),
-                self.game.stockpile[slot]
-            )
+            shape_frame.redraw_shape(self.game.stockpile[slot])
 
 
 class TetrisApp(Tk):
