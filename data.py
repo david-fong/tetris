@@ -128,19 +128,6 @@ COLOR_SCHEMES = {
             'S': 'white',
             'T': 'white',
             'Z': 'white'
-        },
-        'pencil': {
-            'bg': '#80B9BC',
-            'grid-lines': '#9ED5D8',
-            CELL_EMPTY_KEY: '#BAECEF',
-            'text': 'white',
-            'I': 'white',
-            'J': 'white',
-            'L': 'white',
-            'O': 'white',
-            'S': 'white',
-            'T': 'white',
-            'Z': 'white'
         }
     }
 }

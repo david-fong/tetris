@@ -438,7 +438,7 @@ class GameFrame(Frame):
                 stockpile_frame,
                 self.game.shape_size,
                 self.cs,
-                ('slot %d: %s' % (slot + 1, str(bindings[data.STOCKPILE][slot])))
+                (str(bindings[data.STOCKPILE][slot]))
             )
             stockpile.append(shape_frame)
             shape_frame.grid(row=slot, column=0)
@@ -448,6 +448,7 @@ class GameFrame(Frame):
         self.set_color_scheme()
         self.master.bind('<Button-1>', self.start, '+')
         self.master.bind('<Key>', self.decode_move, '+')
+        # TODO: bind to a custom event that makes ceiling length increase
 
     def draw_shape(self, erase: bool = False):
         """
