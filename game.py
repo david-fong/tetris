@@ -352,13 +352,13 @@ class GameFrame(Frame):
     period: float               #
     gravity_after_id = None     # Alarm identifier for after_cancel()
 
-    def configure_canvas(self, game_frame: Frame):
+    def configure_canvas(self, grid_frame: Frame):
         """
         initializes a canvas of rectangle items
         corresponding to cells in the game field's grid
         """
         game = self.game
-        canvas = Canvas(game_frame, relief='flat', bd=0)
+        canvas = Canvas(grid_frame, relief='flat', bd=0)
         canvas.configure(
             height=(data.canvas_dmn(game.dmn.y) - data.GUI_CELL_PAD),
             width=(data.canvas_dmn(game.dmn.x) - data.GUI_CELL_PAD),
@@ -410,7 +410,7 @@ class GameFrame(Frame):
         self.cs_string_var.trace('w', self.set_color_scheme)
 
         grid_frame = Frame(self)
-        grid_frame.pack(side='left')
+        grid_frame.pack(side='left', expand=False)
 
         # Configure the score label
         self.score = StringVar()
@@ -443,7 +443,7 @@ class GameFrame(Frame):
             stockpile.append(shape_frame)
             shape_frame.grid(row=slot, column=0)
         self.stockpile = stockpile
-        stockpile_frame.pack(side='bottom')
+        stockpile_frame.pack(side='bottom', expand=False)
 
         self.set_color_scheme()
         self.master.bind('<Button-1>', self.start, '+')
@@ -743,7 +743,7 @@ class TetrisApp(Tk):
                  num_cols: int = None,
                  num_players: int = 1):
         super(TetrisApp, self).__init__()
-        self.title('Tetris, by David Fong')
+        self.title('Tetris - david fong')
         # self.iconbitmap('error')  # TODO: make a tetromino bitmap
         self.focus_set()
 
@@ -775,7 +775,7 @@ class TetrisApp(Tk):
                 self, num_rows, num_cols,
                 data.get_default_bindings(num_players, player_num)
             )
-            player.grid(row=0, column=player_num)
+            player.grid(row=0, column=player_num, sticky='w')
             players.append(player)
         self.players = tuple(players)
 

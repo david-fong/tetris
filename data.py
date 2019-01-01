@@ -102,6 +102,45 @@ COLOR_SCHEMES = {
             'S': '#B9F466',
             'T': '#FFB2EA',
             'Z': '#F76565'
+        },
+        'old-school': {
+            'bg': '#CACC92',
+            'grid-lines': '#CACC92',
+            CELL_EMPTY_KEY: '#DCDDAA',
+            'text': '#65663C',
+            'I': '#A4A56F',
+            'J': '#A4A56F',
+            'L': '#A4A56F',
+            'O': '#A4A56F',
+            'S': '#A4A56F',
+            'T': '#A4A56F',
+            'Z': '#A4A56F'
+        },
+        'winter': {
+            'bg': '#80B9BC',
+            'grid-lines': '#9ED5D8',
+            CELL_EMPTY_KEY: '#BAECEF',
+            'text': 'white',
+            'I': 'white',
+            'J': 'white',
+            'L': 'white',
+            'O': 'white',
+            'S': 'white',
+            'T': 'white',
+            'Z': 'white'
+        },
+        'pencil': {
+            'bg': '#80B9BC',
+            'grid-lines': '#9ED5D8',
+            CELL_EMPTY_KEY: '#BAECEF',
+            'text': 'white',
+            'I': 'white',
+            'J': 'white',
+            'L': 'white',
+            'O': 'white',
+            'S': 'white',
+            'T': 'white',
+            'Z': 'white'
         }
     }
 }
@@ -115,7 +154,7 @@ TSL = 'move left'
 THL = 'hard left'
 TSR = 'move right'
 THR = 'hard right'
-STOCKPILE = 'access a slot in the stockpile'
+STOCKPILE = 'access stockpile'
 PAUSE = 'pause game'
 RESTART = 'restart the player\'s game'
 """
@@ -161,7 +200,7 @@ DEFAULT_BINDINGS = {
             THL: tuple(),
             TSR: ('l', ),
             THR: tuple(),
-            STOCKPILE: (('7', 'z'), ('8', 'x'), ('9', 'c'), ('0', 'v')),
+            STOCKPILE: (('7', 'b'), ('8', 'n'), ('9', 'm'), ('0', 'comma')),
             PAUSE: ('Caps_Lock', 'Space'),
             RESTART: ('H', )
         }
