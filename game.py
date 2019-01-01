@@ -208,6 +208,21 @@ class Game:
         self.rot = rot
         return True
 
+    def restart(self):
+        for line_num in range(self.dmn.y):
+            for cell in self.grid[line_num]:
+                cell.clear()
+
+        for slot in range(self.shape_size):
+            self.stockpile[slot] = data.SHAPE_EMPTY_NAME
+
+        self.prev_shapes = []
+        self.curr_shape = None
+        self.next_shape = data.get_random_shape(
+            self.shape_size, self.shape_set, self.prev_shapes
+        )
+        self.spawn_next_shape()
+
     def change_shape_set(self, shape_set: str):
         not_compatible: bool = False
         if self.shape_set is not None:
@@ -541,16 +556,21 @@ class GameFrame(Frame):
             self.master.bell()
 
     def restart(self):
-        # TODO
-        return
+        self.after_cancel(self.gravity_after_id)
+        self.game.restart()
+        self.score.set('%d : %d' % (self.game.lines, self.game.score))
+        self.set_color_scheme()
+        self.un_paused = True
+        self.un_pause_gravity()
 
     def decode_move(self, event):
-        if not hasattr(self, 'un_paused') or self.un_paused is None:
-            return
-
-        self.draw_shape(erase=True)
         key = event.keysym
         b = self.bindings
+        if key in b[data.RESTART]:
+            self.restart()
+        elif not hasattr(self, 'un_paused') or self.un_paused is None:
+            return
+        self.draw_shape(erase=True)
 
         # Game paused
         if not self.un_paused:
@@ -602,8 +622,6 @@ class GameFrame(Frame):
         elif key in b[data.PAUSE] and self.un_paused:
             self.un_paused = False
             self.after_cancel(self.gravity_after_id)
-        elif key in b[data.RESTART]:
-            self.restart()
 
         # Stockpile access
         else:
@@ -615,8 +633,6 @@ class GameFrame(Frame):
 
     def game_over(self):
         self.un_paused = None
-        self.after_cancel(self.gravity_after_id)
-        return
 
     def set_period(self, *args):
         """

@@ -196,7 +196,7 @@ PERIOD_GRANULARITY = 2
 
 def get_period(num_lines: int, freq_scalar_index: int):
     freq = (num_lines + FREQ_OFFSET + 1) / (FREQ_OFFSET + 1)
-    freq = 2 * log(freq, FREQ_BASE) + 1
+    freq = 1.5 * log(freq, FREQ_BASE) + 1
     freq *= FREQ_SCALARS[freq_scalar_index]
     return 1000 / freq
 
