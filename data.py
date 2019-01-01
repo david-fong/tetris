@@ -65,8 +65,10 @@ color scheme with key='default'
 COLOR_SCHEMES = {
     4: {
         'default': {
-            'bg': 'gray20',
+            'bg': 'black',
+            'grid-lines': 'gray20',
             CELL_EMPTY_KEY: 'black',
+            'text': 'white',
             'I': 'cyan',
             'J': 'blue',
             'L': 'orange',
@@ -76,8 +78,10 @@ COLOR_SCHEMES = {
             'Z': 'red'
         },
         'black & white': {
-            'bg': 'gray20',
+            'bg': 'black',
+            'grid-lines': 'gray20',
             CELL_EMPTY_KEY: 'black',
+            'text': 'white',
             'I': 'white',
             'J': 'white',
             'L': 'white',
@@ -87,8 +91,10 @@ COLOR_SCHEMES = {
             'Z': 'white'
         },
         'pastel': {
-            'bg': '#FFFFFF',
+            'bg': '#F4F4F4',
+            'grid-lines': '#FFFFFF',
             CELL_EMPTY_KEY: '#F4F4F4',
+            'text': '#000000',
             'I': '#76F7E4',
             'J': '#FFBE63',
             'L': '#FFAE44',
@@ -127,9 +133,7 @@ DEFAULT_BINDINGS = {
             THL: ('A', ),
             TSR: ('d', 'Right'),
             THR: ('D', ),
-            STOCKPILE: (
-
-            ),
+            STOCKPILE: (('1', 'z'), ('2', 'x'), ('3', 'c'), ('4', 'v'), ('5', ), ('6', )),
             PAUSE: ('Caps_Lock', ),
             RESTART: ('Escape', )
         }
@@ -144,7 +148,7 @@ DEFAULT_BINDINGS = {
             THL: tuple(),
             TSR: ('d', ),
             THR: tuple(),
-            STOCKPILE: (),
+            STOCKPILE: (('1', 'z'), ('2', 'x'), ('3', 'c'), ('4', 'v')),
             PAUSE: ('Caps_Lock', 'Space'),
             RESTART: ('F', )
         },
@@ -157,7 +161,7 @@ DEFAULT_BINDINGS = {
             THL: tuple(),
             TSR: ('l', ),
             THR: tuple(),
-            STOCKPILE: (),
+            STOCKPILE: (('7', 'z'), ('8', 'x'), ('9', 'c'), ('0', 'v')),
             PAUSE: ('Caps_Lock', 'Space'),
             RESTART: ('H', )
         }

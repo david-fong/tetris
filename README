@@ -1,7 +1,3 @@
-MY GAME DECISIONS:
-stockpiles are of size <shape_size>
-using DTET rotations system
-
 NOTE: Any time you create settings for data related to a new shape size,
 You must create key bindings to access <shape size> stockpile slots.
 
@@ -12,10 +8,12 @@ I. CREATING A NEW SHAPE SIZE, <n>:
            where the key is the string 'default', and
            its value is a dictionary of shapes with at
            least one shape in it (see II).
-        2. Add a dictionary entry, <n> to data.COLOR_SCHEMES,
+        2. Add a dict entry, <n>, to data.COLOR_SCHEMES,
            and add at least one key-value pair to it
            where the key is the string 'default', and
            its value is a color scheme (See III).
+        3. Ensure that there are enough keybindings to
+           access <n> slots (see III).
 
 II. ADDING YOUR OWN SHAPES (for an existing shape size):
     See data.SHAPES:
@@ -44,3 +42,8 @@ III. ADDING YOUR OWN COLOR SCHEMES (for an existing shape size):
 
 IV. CREATING YOUR OWN KEY-BINDINGS (for an existing shape size):
     See data.BINDINGS:
+        It maps a number of players to a player-bindings set:
+            Ie. a dictionary from an action's special constant to a list of
+            keysyms (strings) for a given player to perform that action.
+    Run keysym.py, and press a key to display its keysym in the created window.
+    Ideally, all players share the same bindings to pause the game

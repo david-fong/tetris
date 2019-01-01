@@ -255,6 +255,7 @@ class ShapeFrame(Frame):
     pos: Pair
     canvas: Canvas
     canvas_ids: tuple   # 2D tuple of canvas item ids
+    label: Label
 
     def __init__(self, master: Frame, shape_size: int, cs: dict, name: str):
         super(ShapeFrame, self).__init__(master)
@@ -264,15 +265,13 @@ class ShapeFrame(Frame):
         self.shape_size = shape_size
         self.pos = Pair(int(shape_size / 2), int(shape_size / 2))
 
-        label = Label(self)
-        label.configure(text=str(name))
-        label.pack()
+        self.label = Label(self, text=str(name))
+        self.label.pack()
 
-        canvas = Canvas(self)
+        canvas = Canvas(self, relief='flat', bd=0)
         canvas.configure(
             height=(data.canvas_dmn(shape_size) - data.GUI_CELL_PAD),
             width=(data.canvas_dmn(shape_size) - data.GUI_CELL_PAD),
-            bg=cs['bg']
         )
         canvas_ids = []
         for y in range(shape_size):
@@ -303,6 +302,12 @@ class ShapeFrame(Frame):
                 canvas_id = self.id_at_tile(t.p[0])
                 self.canvas.itemconfigure(canvas_id, fill=color)
 
+    def set_color_scheme(self):
+        cs = self.parent_game.cs
+        self.configure(bg=cs['bg'])
+        self.canvas.configure(bg=cs['grid-lines'])
+        self.label.configure(bg=cs['bg'], fg=cs['text'])
+
     def id_at_tile(self, p: Pair):
         x = self.pos.x + p.x
         y = self.pos.y + p.y
@@ -328,6 +333,7 @@ class GameFrame(Frame):
 
     un_paused: bool             #
     score: StringVar            #
+    score_label: Label          #
     period: float               #
     gravity_after_id = None     # Alarm identifier for after_cancel()
 
@@ -337,11 +343,10 @@ class GameFrame(Frame):
         corresponding to cells in the game field's grid
         """
         game = self.game
-        canvas = Canvas(game_frame, bg=self.cs['bg'])
+        canvas = Canvas(game_frame, relief='flat', bd=0)
         canvas.configure(
             height=(data.canvas_dmn(game.dmn.y) - data.GUI_CELL_PAD),
             width=(data.canvas_dmn(game.dmn.x) - data.GUI_CELL_PAD),
-            relief='flat'
         )
         # draw cells for each cell in the game
         for y in range(game.dmn.y):
@@ -389,18 +394,18 @@ class GameFrame(Frame):
         self.cs_string_var = master.cs_string_var
         self.cs_string_var.trace('w', self.set_color_scheme)
 
-        game_frame = Frame(self)
-        game_frame.pack(side='left')
+        grid_frame = Frame(self)
+        grid_frame.pack(side='left')
 
         # Configure the score label
         self.score = StringVar()
         self.score.set('left-click to start')
-        score_label = Label(game_frame, textvariable=self.score)
-        score_label.pack(side='top')
+        self.score_label = Label(grid_frame, textvariable=self.score)
+        self.score_label.pack(side='top')
 
         # Configure the next shape display
         self.next_shape = ShapeFrame(
-            game_frame,
+            grid_frame,
             master.shape_size,
             self.cs, 'next shape:'
         )
@@ -408,7 +413,7 @@ class GameFrame(Frame):
         self.next_shape.redraw_shape(self.game.next_shape.name)
 
         # Configure the canvas
-        self.configure_canvas(game_frame)
+        self.configure_canvas(grid_frame)
 
         # Configure the stockpile display
         stockpile_frame = Frame(self)
@@ -417,14 +422,15 @@ class GameFrame(Frame):
             shape_frame = ShapeFrame(
                 stockpile_frame,
                 self.game.shape_size,
-                self.cs, ('slot ' + str(slot) + ':')
+                self.cs,
+                ('slot %d: %s' % (slot + 1, str(bindings[data.STOCKPILE][slot])))
             )
-            # TODO: make stockpile a dict from key_binding to ShapeFrame?
             stockpile.append(shape_frame)
             shape_frame.grid(row=slot, column=0)
         self.stockpile = stockpile
         stockpile_frame.pack(side='bottom')
 
+        self.set_color_scheme()
         self.master.bind('<Button-1>', self.start, '+')
         self.master.bind('<Key>', self.decode_move, '+')
 
@@ -601,12 +607,9 @@ class GameFrame(Frame):
 
         # Stockpile access
         else:
-            try:
-                slot = int(key) - 1
-                if slot in range(data.STOCKPILE_CAPACITY):
+            for slot in range(self.game.shape_size):
+                if key in b[data.STOCKPILE][slot]:
                     self.stockpile_access(slot)
-            except ValueError:
-                pass
 
         self.draw_shape()
 
@@ -639,27 +642,31 @@ class GameFrame(Frame):
         a trace method associated with
         the parent window's color menu.
         """
+        # update the color scheme field
         schemes = data.COLOR_SCHEMES[self.game.shape_size]
         self.cs = schemes[self.cs_string_var.get()]
+        self.configure(bg=self.cs['bg'])
 
         # redraw the next shape canvas
-        self.next_shape.canvas.configure(bg=self.cs['bg'])
+        self.next_shape.set_color_scheme()
         self.next_shape.redraw_shape(self.game.next_shape.name)
 
         # redraw the main canvas
-        self.canvas.configure(bg=self.cs['bg'])
+        self.canvas.master.configure(bg=self.cs['bg'])
+        self.canvas.configure(bg=self.cs['grid-lines'])
         for y in range(self.game.dmn.y):
             for cell in self.game.grid[y]:
                 self.canvas.itemconfigure(
                     cell.canvas_id, fill=self.cs[cell.key]
                 )
         self.draw_shape()
+        self.score_label.configure(bg=self.cs['bg'], fg=self.cs['text'])
 
         # redraw each slot in the stockpile
+        self.stockpile[0].master.configure(bg=self.cs['bg'])
         for slot in range(self.game.shape_size):
-            shape_frame: ShapeFrame = self.stockpile[slot]
-            shape_frame.canvas.configure(bg=self.cs['bg'])
-            shape_frame.redraw_shape(self.game.stockpile[slot])
+            self.stockpile[slot].set_color_scheme()
+            self.stockpile[slot].redraw_shape(self.game.stockpile[slot])
 
 
 class TetrisApp(Tk):
