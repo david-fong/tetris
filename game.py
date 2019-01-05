@@ -272,6 +272,11 @@ class Game:
 
 
 class ShapeFrame(Frame):
+    """
+    Used to display the shape in a Game object's
+    stockpile at a specific slot. Labeled with the
+    key a user should press to access this slot.
+    """
     parent_game = None
     shape_size: int
     pos: Pair
@@ -338,7 +343,8 @@ class ShapeFrame(Frame):
 
 class GameFrame(Frame):
     """
-
+    Displays the Game object corresponding to a
+    specific player (there may be multiple).
     """
     master: Frame               # top level frame
     game: Game                  #
@@ -544,10 +550,13 @@ class GameFrame(Frame):
             self.set_curr_shape()
         else:
             self.draw_shape()
-        self.gravity_after_id = self.master.after(
-            ms=int(self.period),
-            func=self.gravity
-        )
+
+        if self.un_paused:
+            # above if statement not absolutely necessary.
+            self.gravity_after_id = self.master.after(
+                ms=int(self.period),
+                func=self.gravity
+            )
 
     def un_pause_gravity(self):
         self.gravity_after_id = self.master.after(
@@ -566,6 +575,7 @@ class GameFrame(Frame):
     def restart(self):
         self.after_cancel(self.gravity_after_id)
         self.game.restart()
+        self.set_period()
         self.score.set('%d : %d' % (self.game.lines, self.game.score))
         self.set_color_scheme()
         self.un_paused = True
@@ -629,7 +639,7 @@ class GameFrame(Frame):
             while not done:
                 done = self.game.translate(1)
 
-        # Game un-paused
+        # Game un-paused -> Pause game
         elif key in b[data.PAUSE] and self.un_paused:
             self.un_paused = False
             self.after_cancel(self.gravity_after_id)
@@ -699,7 +709,7 @@ class GameFrame(Frame):
 class TetrisApp(Tk):
     """
     Implements a window.
-    contains a number of GameFrame Frames
+    Contains a number of GameFrame Frames
     """
     shape_size: int
     speed_index_int_var: IntVar
@@ -792,7 +802,7 @@ class TetrisApp(Tk):
 
     def popup_controls(self):
         """
-        pops up a window for each player displaying their controls
+        Pops up a window for each player displaying their controls.
         """
         for player_num in range(len(self.players)):
             player: GameFrame = self.players[player_num]

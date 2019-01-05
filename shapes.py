@@ -2,6 +2,9 @@ from math import ceil
 
 
 class Pair:
+    """
+    A coordinate in 2D space.
+    """
     x: int
     y: int
 
@@ -141,6 +144,12 @@ class Shape:
         return True
 
     def extreme(self, rot: int, direction: int):
+        """
+        Returns the maximum distance of a tile
+        from its parent shape's current position,
+        in its current rotation with respect to
+        the specified direction.
+        """
         tile = self.faces[(rot + direction) % 4][0]
         pair = tile.p[rot]
         if direction % 2 is 0:
